@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    // 1. Users Collection
+    match /Users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+
+    // 2. Pharmacies Collection
+    match /Pharmacies/{pharmacyId} {
+      allow read: if true; // Public catalog view
+      allow create, update: if hasRole('pharmacy') || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+
+    // 3. Medicines Collection (Belongs to 1 Pharmacy)
+    match /Medicines/{medicineId} {
+      allow read: if true; // Public medicine search
+      allow create, update, delete: if hasRole('pharmacy') || hasRole('admin');
+    }
+
+    // 4. Orders Collection (Belongs to 1 Customer, Optional 1 Delivery Partner)
+    match /Orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customer_id == request.auth.uid ||
+        resource.data.pharmacy_id == request.auth.uid ||
+        resource.data.delivery_partner_id == request.auth.uid ||
+        hasRole('admin')
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
+
+    // 5. DeliveryPartners Collection
+    match /DeliveryPartners/{partnerId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasRole('delivery') || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+
+    // 6. Prescriptions Collection
+    match /Prescriptions/{rxId} {
+      allow read: if isAuthenticated() && (
+        resource.data.user_id == request.auth.uid ||
+        hasRole('pharmacy') ||
+        hasRole('admin')
+      );
+      allow create: if isAuthenticated();
+      allow update: if hasRole('pharmacy') || hasRole('admin');
+    }
+
+    // 7. Notifications Collection
+    match /Notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // 8. Reviews Collection
+    match /Reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(resource.data.user_id) || hasRole('admin');
+    }
+  }
+}
