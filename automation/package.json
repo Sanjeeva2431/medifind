@@ -1,0 +1,14 @@
+{
+  "name": "medifind-selenium-automation",
+  "version": "1.0.0",
+  "description": "Enterprise-Grade Selenium E2E Automation Framework for Live GitHub Pages Deployment",
+  "main": "runner.js",
+  "type": "module",
+  "scripts": {
+    "test:live": "node runner.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "selenium-webdriver": "^4.19.0"
+  }
+}
