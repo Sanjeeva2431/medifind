@@ -1,0 +1,28 @@
+name: MediFind Docker Container Build & Quality Check
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  docker-build:
+    name: Build Docker Image & Verify Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build MediFind Docker Image
+        run: |
+          docker build -t medifind-fullstack:latest .
+
+      - name: 📦 Verify Docker Compose Build
+        run: |
+          docker compose config
