@@ -1,0 +1,22 @@
+{
+  "name": "medifind-appium-tests",
+  "version": "1.0.0",
+  "description": "Appium Mobile Android E2E Automated Test Suite with Excel Reporting for MediFind",
+  "main": "runner.js",
+  "type": "module",
+  "scripts": {
+    "test:appium": "node runner.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "keywords": [
+    "appium",
+    "android",
+    "automation",
+    "testing",
+    "mobile",
+    "e2e",
+    "excel-report"
+  ]
+}

@@ -8,7 +8,8 @@
     "start": "node backend/server.js",
     "seed": "node backend/seed/seed.js",
     "dev": "node backend/server.js",
-    "test:load": "node scripts/loadTest.js"
+    "test:load": "node scripts/loadTest.js",
+    "test:appium": "node appium-tests/runner.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
