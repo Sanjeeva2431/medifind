@@ -9,7 +9,8 @@
     "seed": "node backend/seed/seed.js",
     "dev": "node backend/server.js",
     "test:load": "node scripts/loadTest.js",
-    "test:appium": "node appium-tests/runner.js"
+    "test:appium": "node appium-tests/runner.js",
+    "test:selenium": "node selenium-tests/runner.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

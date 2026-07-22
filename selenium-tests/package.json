@@ -1,0 +1,24 @@
+{
+  "name": "medifind-selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium Web End-to-End Automated Test Suite in Node.js with Excel Reporting for MediFind",
+  "main": "runner.js",
+  "type": "module",
+  "scripts": {
+    "test:selenium": "node runner.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "selenium-webdriver": "^4.19.0"
+  },
+  "keywords": [
+    "selenium",
+    "webdriver",
+    "automation",
+    "testing",
+    "web",
+    "e2e",
+    "excel-report",
+    "nodejs"
+  ]
+}
