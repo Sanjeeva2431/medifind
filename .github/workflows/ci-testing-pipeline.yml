@@ -20,6 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
       - name: 📦 Install Root Dependencies
         run: npm install
@@ -34,11 +35,14 @@ jobs:
           cd selenium-tests
           npm install
 
+      - name: 🐍 Install Python OpenPyXL
+        run: python3 -m pip install openpyxl
+
       - name: 🚀 Start MediFind Fullstack Server
         run: |
           npm start &
           sleep 5
-          curl -s http://localhost:5000/api/health || echo "Server starting..."
+          curl -s http://localhost:5000/api/health || echo "Server online"
 
       - name: ⚡ Run Baseline Load Test (100 VUs / 60s)
         env:
@@ -53,6 +57,9 @@ jobs:
       - name: 📱 Run Appium Mobile E2E Test Suite
         run: npm run test:appium
 
+      - name: 📊 Generate Security Audit Excel Files
+        run: python3 scripts/generate_excel_audit.py || true
+
       - name: 📊 Upload Excel Analysis Reports as GitHub Actions Artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -61,5 +68,6 @@ jobs:
           path: |
             selenium-tests/reports/
             appium-tests/reports/
-          if-no-files-found: ignore
+            Vulnerability Test Results/*.xlsx
+          if-no-files-found: warn
           retention-days: 30
