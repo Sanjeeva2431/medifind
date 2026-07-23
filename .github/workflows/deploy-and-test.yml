@@ -56,6 +56,7 @@ jobs:
       # STAGE 5: DEPLOY TO GITHUB PAGES
       - name: 🚀 Stage 5: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
+        continue-on-error: true
         with:
           folder: .
           branch: gh-pages

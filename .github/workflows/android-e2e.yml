@@ -15,7 +15,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "android-e2e"
+  group: "android-e2e-pages"
   cancel-in-progress: false
 
 jobs:
@@ -161,6 +161,7 @@ jobs:
       - name: 🌐 Deploy Reports to gh-pages Branch
         uses: JamesIves/github-pages-deploy-action@v4
         if: always() && github.ref == 'refs/heads/main'
+        continue-on-error: true
         with:
           folder: public
           branch: gh-pages
