@@ -1,8 +1,10 @@
 # MediFind – Real-Time Medicine Finder & Home Delivery Platform (Full-Stack MVP)
 
 [![MediFind CI/CD & Automated E2E Testing Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/deploy-and-test.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/deploy-and-test.yml)
-[![MediFind Docker Container Build & Quality Check](https://github.com/Sanjeeva2431/medifind/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/docker-build.yml)
-[![Android Appium E2E Automation Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/android-e2e.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/android-e2e.yml)
+[![Appium Mobile Excel Analysis Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/appium-mobile-excel.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/appium-mobile-excel.yml)
+[![Baseline Load Test Excel Analysis Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/baseline-load-excel.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/baseline-load-excel.yml)
+[![Python Appium Excel Analysis Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/python-appium-excel.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/python-appium-excel.yml)
+[![Selenium Web Excel Analysis Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/selenium-web-excel.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/selenium-web-excel.yml)
 
 MediFind is a full-stack real-time medicine availability, price comparison, prescription OCR reading, and home delivery platform (Zomato for medicines).
 
