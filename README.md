@@ -1,5 +1,9 @@
 # MediFind – Real-Time Medicine Finder & Home Delivery Platform (Full-Stack MVP)
 
+[![MediFind CI/CD & Automated E2E Testing Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/deploy-and-test.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/deploy-and-test.yml)
+[![MediFind Docker Container Build & Quality Check](https://github.com/Sanjeeva2431/medifind/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/docker-build.yml)
+[![Android Appium E2E Automation Pipeline](https://github.com/Sanjeeva2431/medifind/actions/workflows/android-e2e.yml/badge.svg)](https://github.com/Sanjeeva2431/medifind/actions/workflows/android-e2e.yml)
+
 MediFind is a full-stack real-time medicine availability, price comparison, prescription OCR reading, and home delivery platform (Zomato for medicines).
 
 ---
@@ -12,6 +16,7 @@ MediFind is a full-stack real-time medicine availability, price comparison, pres
 - **Database Engine**: Mongoose OR fall-back memory engine populating 100+ medicines, 20 pharmacies, 50 users, 15 delivery partners.
 - **AI Features**: AI Prescription Reader (OCR), AI Healthcare Chatbot, Generic Alternatives Recommender with price savings.
 - **DevOps Ready**: Dockerfile, `docker-compose.yml`, `.env.example`, seed initialization script.
+- **Automated Testing Suite**: 470 Selenium Web E2E test cases, 430 Android Appium mobile E2E test cases, multi-format Excel workbooks, interactive HTML report dashboards, and live GitHub Pages deployment.
 
 ---
 
