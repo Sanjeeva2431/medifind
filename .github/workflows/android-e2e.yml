@@ -26,7 +26,7 @@ jobs:
     env:
       ANDROID_ARCH: x86_64
       ANDROID_TARGET: google_apis
-      API_LEVEL: 33
+      API_LEVEL: 29
       APPIUM_HOST: 127.0.0.1
       APPIUM_PORT: 4723
 
@@ -55,7 +55,7 @@ jobs:
           npm install -g appium
           appium driver install uiautomator2 || true
           cd automation && npm install && cd ..
-          python3 -m pip install openpyxl
+          python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
 
       # STAGE 5: BUILD APK
       - name: 🔨 Stage 5: Build APK
@@ -67,10 +67,12 @@ jobs:
       - name: 📱 Stage 6 & 7: Start & Verify Android Emulator Readiness
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: pixel_5
+          api-level: 29
+          target: default
+          arch: x86
+          profile: pixel
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             adb wait-for-device
             adb shell input keyevent 82

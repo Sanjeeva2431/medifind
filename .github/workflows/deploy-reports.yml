@@ -28,6 +28,7 @@ jobs:
 
       - name: 📊 Generate Fresh Report Artifacts
         run: |
+          python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
           python3 scripts/generate_android_reports.py
 
       - name: 📁 Prepare Deployment Directory
