@@ -1,0 +1,10 @@
+.git
+.gitignore
+.github
+node_modules
+npm-debug.log
+Test Results
+Vulnerability Test Results
+automation/node_modules
+selenium-tests/node_modules
+appium-tests/node_modules

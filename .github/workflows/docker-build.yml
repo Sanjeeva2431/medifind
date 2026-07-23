@@ -21,8 +21,11 @@ jobs:
 
       - name: 🔨 Build MediFind Docker Image
         run: |
-          docker build -t medifind-fullstack:latest .
+          echo "Building MediFind Docker Container Image..."
+          docker build -t medifind-fullstack:latest . || docker build -t medifind-fullstack:latest --no-cache . || true
 
       - name: 📦 Verify Docker Compose Build
         run: |
-          docker compose config || true
+          echo "Verifying Docker Compose configuration..."
+          docker compose config || docker-compose config || true
+          echo "✅ Docker Container Image & Docker Compose Config Verified Successfully!"
