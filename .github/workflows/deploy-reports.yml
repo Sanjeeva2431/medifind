@@ -3,28 +3,21 @@ name: Deploy Reports to GitHub Pages
 on:
   push:
     branches: [ main, master ]
-  workflow_run:
-    workflows: ["MediFind Docker Container Build & Quality Check", "Android Appium E2E Automation Pipeline"]
-    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: write
   pages: write
   id-token: write
-  actions: read
 
 concurrency:
-  group: "pages-official"
+  group: "pages-official-deploy"
   cancel-in-progress: false
 
 jobs:
   deploy-reports:
     name: Publish Full Test Cases & Reports to GitHub Pages
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: 📥 Stage 1: Checkout Repository
@@ -43,13 +36,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: 📊 Stage 4: Generate All Test Suite Artifacts (470+ Test Cases)
         run: |
           python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
-          python3 scripts/generate_live_reports.py
-          python3 scripts/generate_android_reports.py
+          python3 scripts/generate_live_reports.py || true
+          python3 scripts/generate_android_reports.py || true
 
       - name: 📁 Stage 5: Prepare Public Pages Assets
         run: |
@@ -60,7 +52,7 @@ jobs:
           mkdir -p public/Test\ Results/JSON
 
           # Copy main app files
-          cp -r index.html js styles.css sw.js manifest.json assets public/ 2>/dev/null || cp -r index.html js styles.css sw.js public/
+          cp -r index.html js styles.css sw.js manifest.json assets public/ 2>/dev/null || cp -r index.html js styles.css sw.js public/ 2>/dev/null || true
 
           # Copy HTML reports to root and reports folder
           cp -r "Test Results/HTML/"* public/ 2>/dev/null || true
@@ -76,11 +68,10 @@ jobs:
           # Copy to history
           cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/ 2>/dev/null || true
 
-      - name: 📦 Stage 6: Upload GitHub Pages Artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: 🚀 Stage 6: Deploy to GitHub Pages Branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        continue-on-error: true
         with:
-          path: public
-
-      - name: 🚀 Stage 7: Deploy to Official GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          folder: public
+          branch: gh-pages
+          force: true

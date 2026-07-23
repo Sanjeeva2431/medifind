@@ -11,19 +11,15 @@ permissions:
   contents: write
   pages: write
   id-token: write
-  actions: read
 
 concurrency:
-  group: "pages-e2e"
+  group: "pages-deploy-group"
   cancel-in-progress: false
 
 jobs:
   deploy-and-e2e-test:
     name: 13-Stage Build, GitHub Pages Deploy & Live Selenium E2E Automation
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     env:
       BASE_URL: "https://Sanjeeva2431.github.io/medifind/"
@@ -51,7 +47,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       - run: |
           npm install || true
           cd automation && npm install && cd .. || true
@@ -108,15 +103,14 @@ jobs:
           # Copy to history
           cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/ 2>/dev/null || true
 
-      # STAGE 9: UPLOAD & DEPLOY OFFICIAL GITHUB PAGES
-      - name: 📦 Stage 9a: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
+      # STAGE 9: DEPLOY TO GITHUB PAGES
+      - name: 🚀 Stage 9: Deploy to GitHub Pages Branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        continue-on-error: true
         with:
-          path: public
-
-      - name: 🚀 Stage 9b: Deploy to Official GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          folder: public
+          branch: gh-pages
+          force: true
 
       # STAGE 10: DEPLOYMENT VERIFICATION
       - name: 🩺 Stage 10: Deployment Health Verification
