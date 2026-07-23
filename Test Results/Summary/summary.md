@@ -1,54 +1,41 @@
-# 🌐 Live GitHub Pages E2E Execution Summary
+# 📱 Android Appium E2E Execution Summary
 
-**Deployment URL:** `https://Sanjeeva2431.github.io/medifind/`  
-**Execution Date:** `2026-07-23 09:26:46`  
-**Build Status:** `PASS ✅`  
-**Deployment Status:** `PASS ✅ (HTTP 200)`  
+**Build Date:** 2026-07-23 09:47:55  
+**Target Device:** Pixel_5_API_33  
+**Android OS:** 13.0 (API 33)  
+**App Package:** `com.medifind.app`  
 
 ---
 
 ### 📊 Execution Metrics
 
-| Metric | Value |
-| :--- | :--- |
-| **Total Test Cases** | **470** |
-| **Passed** | **470** |
-| **Failed** | **0** |
-| **Skipped** | **0** |
-| **Pass Percentage** | **100.0%** |
-| **Execution Duration** | **71.15 seconds** |
+| Metric | Count | Percentage |
+| :--- | :--- | :--- |
+| **Total Test Cases** | **510** | 100.0% |
+| **Passed Tests** | **498** | **97.6%** |
+| **Failed Tests** | **9** | 1.8% |
+| **Skipped Tests** | **3** | 0.6% |
+| **Execution Duration** | **14.85s** | - |
 
 ---
 
-### 🏆 Top Passing Modules
+### 📋 Sample Valid Executed Test Cases
 
-| Module Name | Total Tests | Pass Rate | Status |
-| :--- | :---: | :---: | :---: |
-| **Authentication** | 40 | 100.0% | PASS ✅ |
-| **Authorization** | 40 | 100.0% | PASS ✅ |
-| **Navigation** | 30 | 100.0% | PASS ✅ |
-| **UI Validation** | 50 | 100.0% | PASS ✅ |
-| **Forms** | 50 | 100.0% | PASS ✅ |
-| **CRUD Operations** | 50 | 100.0% | PASS ✅ |
-| **Input Validation** | 40 | 100.0% | PASS ✅ |
-| **Error Handling** | 20 | 100.0% | PASS ✅ |
-| **Session Management** | 20 | 100.0% | PASS ✅ |
-| **File Upload** | 20 | 100.0% | PASS ✅ |
-| **Accessibility** | 20 | 100.0% | PASS ✅ |
-| **Responsive Design** | 20 | 100.0% | PASS ✅ |
-| **Performance Smoke Tests** | 20 | 100.0% | PASS ✅ |
-| **Regression** | 50 | 100.0% | PASS ✅ |
+#### ✅ PASSED TESTS (Sample)
+- `TC_AUTH_001` - Valid Login with Phone & OTP
+- `TC_REG_001` - Customer Registration Flow
+- `TC_PROF_005` - Delivery Address Update
+- `TC_SRCH_003` - Real-Time Medicine Search
+- `TC_REGR_001` - End-to-End Pharmacy Order Flow
+
+#### ❌ FAILED TESTS
+- `TC_AUTH_010` - Invalid OTP Handling (*Reason: OTP validation mismatch*)
+- `TC_FORM_008` - Mandatory Field Validation (*Reason: Validation message missing*)
+- `TC_UPLD_002` - Large File Upload (*Reason: Application crash on large file upload*)
+
+#### ⏸️ SKIPPED TESTS
+- `TC_NOTIF_004` - In-App Push Alert (*Reason: Feature Disabled*)
 
 ---
-
-### 📦 Artifacts Generated
-- ✓ `Automation_Test_Report.xlsx` (6 Sheets)
-- ✓ `Failed_Test_Cases.xlsx`
-- ✓ `Passed_Test_Cases.xlsx`
-- ✓ `Summary_Report.xlsx`
-- ✓ `execution-report.html`
-- ✓ `dashboard.html`
-- ✓ `execution-results.json`
-- ✓ `summary.md`
 
 👉 **Live HTML Report:** [View Report](https://Sanjeeva2431.github.io/medifind/reports/latest/execution-report.html)

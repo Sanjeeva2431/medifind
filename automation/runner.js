@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import openpyxl from 'openpyxl'; // Python runner builds the 4 Excel files cleanly
 import { config } from './config/selenium.config.js';
 import { runLiveSuites } from './tests/testSuites.js';
 
