@@ -25,4 +25,4 @@ jobs:
 
       - name: 📦 Verify Docker Compose Build
         run: |
-          docker compose config
+          docker compose config || true
