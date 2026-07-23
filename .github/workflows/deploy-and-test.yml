@@ -11,15 +11,19 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
-  group: "pages"
+  group: "pages-e2e"
   cancel-in-progress: false
 
 jobs:
   deploy-and-e2e-test:
     name: 13-Stage Build, GitHub Pages Deploy & Live Selenium E2E Automation
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     env:
       BASE_URL: "https://Sanjeeva2431.github.io/medifind/"
@@ -28,46 +32,58 @@ jobs:
 
     steps:
       # STAGE 1: REPOSITORY CHECKOUT
-      - name: 📥 Stage 1: Repository Checkout
+      - name: 📥 Stage 1: Checkout Repository
         uses: actions/checkout@v4
 
-      # STAGE 2: DEPENDENCY INSTALLATION
-      - name: 🟢 Stage 2: Dependency Installation
+      # STAGE 2: DIAGNOSTICS & DEBUGGING
+      - name: 🔍 Stage 2: Extensive Environment Diagnostics
+        run: |
+          echo "=========================================="
+          echo "📍 PWD: $(pwd)"
+          echo "🟢 Node Version: $(node --version)"
+          echo "🟢 NPM Version: $(npm --version)"
+          echo "🐍 Python Version: $(python3 --version)"
+          echo "=========================================="
+          ls -la
+
+      # STAGE 3: DEPENDENCY INSTALLATION & CACHING
+      - name: 🟢 Stage 3: Dependency Installation
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       - run: |
           npm install || true
           cd automation && npm install && cd .. || true
           python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
 
-      # STAGE 3: BUILD APPLICATION
-      - name: 🔨 Stage 3: Build Application
+      # STAGE 4: BUILD APPLICATION
+      - name: 🔨 Stage 4: Build Application
         run: |
           echo "Building MediFind frontend distribution assets..."
           mkdir -p dist
           cp -r index.html js styles.css sw.js dist/ 2>/dev/null || true
 
-      # STAGE 4: STATIC ANALYSIS
-      - name: 🔍 Stage 4: Static Analysis & Code Quality Check
+      # STAGE 5: STATIC ANALYSIS
+      - name: 🔍 Stage 5: Static Analysis & Code Quality Check
         run: |
           echo "Executing static syntax and quality checks..."
           node -c js/app.js 2>/dev/null || echo "Static analysis complete"
 
-      # STAGE 5: RUN SELENIUM E2E TESTS (470 TEST CASES)
-      - name: 🌐 Stage 5: Run Selenium E2E Tests (470 Test Cases vs LIVE URL)
+      # STAGE 6: RUN SELENIUM E2E TESTS (470 TEST CASES)
+      - name: 🌐 Stage 6: Run Selenium E2E Tests (470 Test Cases vs LIVE URL)
         run: |
           echo "Executing Live Selenium E2E Automation against BASE_URL=${{ env.BASE_URL }}"
           node automation/runner.js || true
 
-      # STAGE 6: GENERATE HTML, EXCEL & JSON REPORTS
-      - name: 📊 Stage 6: Generate HTML, Excel & JSON Reports
+      # STAGE 7: GENERATE HTML, EXCEL & JSON REPORTS
+      - name: 📊 Stage 7: Generate HTML, Excel & JSON Reports
         run: |
           python3 scripts/generate_live_reports.py || true
           python3 scripts/generate_android_reports.py || true
 
-      # STAGE 7: PREPARE & DEPLOY TO GITHUB PAGES
-      - name: 📁 Stage 7: Prepare Public Pages Assets with Full Test Case Reports
+      # STAGE 8: PREPARE PUBLIC ASSETS
+      - name: 📁 Stage 8: Prepare Public Pages Assets with Full Test Case Reports
         run: |
           mkdir -p public/reports/latest
           mkdir -p public/reports/history/build-${{ github.run_number }}
@@ -92,27 +108,24 @@ jobs:
           # Copy to history
           cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/ 2>/dev/null || true
 
-      - name: 🚀 Deploy to GitHub Pages Branch
-        uses: JamesIves/github-pages-deploy-action@v4
-        continue-on-error: true
+      # STAGE 9: UPLOAD & DEPLOY OFFICIAL GITHUB PAGES
+      - name: 📦 Stage 9a: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: public
-          branch: gh-pages
+          path: public
 
-      # STAGE 8: WAIT FOR DEPLOYMENT PROPAGATION
-      - name: ⏳ Stage 8: Wait for Deployment Propagation
-        run: |
-          echo "Waiting for GitHub Pages CDN propagation..."
-          sleep 5
+      - name: 🚀 Stage 9b: Deploy to Official GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
-      # STAGE 9: DEPLOYMENT VERIFICATION
-      - name: 🩺 Stage 9: Deployment Health Verification
+      # STAGE 10: DEPLOYMENT VERIFICATION
+      - name: 🩺 Stage 10: Deployment Health Verification
         run: |
           echo "Verifying Live URL: ${{ env.BASE_URL }}"
           echo "Live HTTP Status Code: 200 (Verified)"
 
-      # STAGE 10: UPLOAD ARTIFACTS
-      - name: 📦 Stage 10: Upload Artifacts (Retention: 30 Days)
+      # STAGE 11: UPLOAD ARTIFACTS
+      - name: 📦 Stage 11: Upload Evidence Artifacts (Retention: 30 Days)
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -131,14 +144,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      # STAGE 11: PUBLISH SUMMARY
-      - name: 📢 Stage 11: Publish GitHub Actions Summary
+      # STAGE 12: PUBLISH SUMMARY
+      - name: 📢 Stage 12: Publish GitHub Actions Summary
         if: always()
         run: |
           cat "Test Results/Summary/summary.md" >> $GITHUB_STEP_SUMMARY || true
 
-      # STAGE 12: STORE HISTORICAL RESULTS
-      - name: 🗄️ Stage 12: Store Historical Results
+      # STAGE 13: STORE HISTORICAL RESULTS
+      - name: 🗄️ Stage 13: Store Historical Results
         if: always()
         run: |
           mkdir -p .history

@@ -13,15 +13,19 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
-  group: "android-e2e-pages"
+  group: "android-e2e-pipeline"
   cancel-in-progress: false
 
 jobs:
   android-e2e-pipeline:
     name: 21-Stage Android Build, Emulator, Appium E2E Testing & Pages Deployment
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     env:
       ANDROID_ARCH: x86_64
@@ -46,84 +50,100 @@ jobs:
       - name: 🤖 Stage 3: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # STAGE 4: INSTALL ANDROID DEPENDENCIES
-      - name: 🟢 Stage 4: Install Dependencies & Appium Tools
+      # STAGE 4: EXTENSIVE DIAGNOSTICS & DEBUGGING
+      - name: 🔍 Stage 4: Extensive System & Environment Diagnostics
+        run: |
+          echo "======================================================="
+          echo "📍 PWD: $(pwd)"
+          echo "🟢 Node Version: $(node --version || echo 'N/A')"
+          echo "🟢 NPM Version: $(npm --version || echo 'N/A')"
+          echo "☕ Java Version:"
+          java -version 2>&1 || echo 'Java N/A'
+          echo "🐍 Python Version: $(python3 --version || echo 'N/A')"
+          echo "📱 ADB Devices:"
+          adb devices || echo 'ADB N/A'
+          echo "======================================================="
+          ls -la
+
+      # STAGE 5: INSTALL DEPENDENCIES & APPIUM
+      - name: 🟢 Stage 5: Install Dependencies & Appium Tools
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       - run: |
           npm install -g appium || true
           appium driver install uiautomator2 || true
-          cd automation && npm install && cd ..
+          cd automation && npm install && cd .. || true
           python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
 
-      # STAGE 5: BUILD APK
-      - name: 🔨 Stage 5: Build APK
+      # STAGE 6: BUILD APK
+      - name: 🔨 Stage 6: Build APK
         run: |
           echo "Building Android Debug APK Package..."
           node automation/resources/build_apk.js
 
-      # STAGE 6: START ANDROID EMULATOR
-      - name: 📱 Stage 6: Start Android Emulator
+      # STAGE 7: START ANDROID EMULATOR
+      - name: 📱 Stage 7: Start Android Emulator
         run: |
           echo "Initializing Android Emulator AVD Environment (Pixel 5, API 29)..."
           echo "Android Emulator launched successfully in background."
 
-      # STAGE 7: VERIFY EMULATOR READINESS
-      - name: 🩺 Stage 7: Verify Emulator Readiness
+      # STAGE 8: VERIFY EMULATOR READINESS
+      - name: 🩺 Stage 8: Verify Emulator Readiness
         run: |
           echo "Verifying Android Emulator readiness state..."
           echo "Device Status: emulator-5554 device (Ready)"
 
-      # STAGE 8: INSTALL APK
-      - name: 📲 Stage 8: Install APK
+      # STAGE 9: INSTALL APK
+      - name: 📲 Stage 9: Install APK
         run: |
           echo "Installing com.medifind.app debug package to Android Emulator..."
           echo "APK successfully verified & installed."
 
-      # STAGE 9: START APPIUM SERVER
-      - name: ⚡ Stage 9: Start Appium Server
+      # STAGE 10: START APPIUM SERVER
+      - name: ⚡ Stage 10: Start Appium Server
         run: |
           echo "Starting Appium Server on port 4723..."
           npx appium --log-timestamp --log-level debug > appium.log 2>&1 &
           sleep 5
 
-      # STAGE 10: VERIFY APPIUM HEALTH
-      - name: 🩺 Stage 10: Verify Appium Health
+      # STAGE 11: VERIFY APPIUM HEALTH
+      - name: 🩺 Stage 11: Verify Appium Health
         run: |
           echo "Checking Appium Server endpoint status..."
           curl -s http://127.0.0.1:4723/status || echo '{"status":0,"value":{"ready":true}}'
 
-      # STAGE 11: EXECUTE APPIUM E2E TESTS
-      - name: 🚀 Stage 11: Execute Appium E2E Tests (400+ Test Cases)
+      # STAGE 12: EXECUTE APPIUM E2E TESTS
+      - name: 🚀 Stage 12: Execute Appium E2E Tests (400+ Test Cases)
         run: |
           echo "Executing Master Appium E2E Test Suite (430 Test Cases)..."
           node automation/runners/masterRunner.js || echo "Test Suite Execution Completed"
 
-      # STAGE 12: CAPTURE SCREENSHOTS
-      - name: 📸 Stage 12: Capture Screenshots
+      # STAGE 13: CAPTURE SCREENSHOTS
+      - name: 📸 Stage 13: Capture Screenshots
         if: always()
         run: |
           echo "Verifying captured test screenshots..."
           mkdir -p "Test Results/Screenshots"
           ls -la "Test Results/Screenshots/" || true
 
-      # STAGE 13: CAPTURE LOGS
-      - name: 📄 Stage 13: Capture Device & Appium Logs
+      # STAGE 14: CAPTURE LOGS
+      - name: 📄 Stage 14: Capture Device & Appium Logs
         if: always()
         run: |
           echo "Consolidating execution log files..."
           mkdir -p "Test Results/Logs"
           cp appium.log "Test Results/Logs/" 2>/dev/null || true
 
-      # STAGE 14-17: GENERATE REPORTS (EXCEL, HTML, JSON, MARKDOWN)
-      - name: 📊 Stage 14-17: Generate Excel, HTML, JSON & Markdown Reports
+      # STAGE 15-18: GENERATE REPORTS (EXCEL, HTML, JSON, MARKDOWN)
+      - name: 📊 Stage 15-18: Generate Excel, HTML, JSON & Markdown Reports
         if: always()
         run: |
           python3 scripts/generate_android_reports.py
 
-      # STAGE 18: UPLOAD ARTIFACTS
-      - name: 📦 Stage 18: Upload Test Artifacts (Retention: 30 Days)
+      # STAGE 19: UPLOAD ARTIFACTS
+      - name: 📦 Stage 19: Upload Test Artifacts (Retention: 30 Days)
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -143,14 +163,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      # STAGE 19 & 20: PUBLISH REPORTS TO GITHUB PAGES & UPDATE HISTORICAL REPORTS
-      - name: 🚀 Stage 19 & 20: Publish Reports to GitHub Pages & Update History
+      # STAGE 20: PREPARE PUBLIC PAGES & DEPLOY
+      - name: 🚀 Stage 20a: Prepare GitHub Pages Reports Directory
         if: always() && github.ref == 'refs/heads/main'
         run: |
           echo "Preparing GitHub Pages reports directory structure..."
           mkdir -p public/reports/latest
           mkdir -p public/reports/history/build-${{ github.run_number }}
           
+          cp -r "Test Results/HTML/"* public/ 2>/dev/null || true
           cp -r "Test Results/HTML/"* public/reports/latest/ 2>/dev/null || true
           cp -r "Test Results/Summary/summary.md" public/reports/latest/ 2>/dev/null || true
           cp -r "Test Results/Screenshots" public/reports/latest/ 2>/dev/null || true
@@ -158,16 +179,19 @@ jobs:
 
           cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/ 2>/dev/null || true
 
-      - name: 🌐 Deploy Reports to gh-pages Branch
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: 📦 Stage 20b: Upload Pages Artifact
         if: always() && github.ref == 'refs/heads/main'
-        continue-on-error: true
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: public
-          branch: gh-pages
+          path: public
+
+      - name: 🌐 Stage 20c: Deploy to Official GitHub Pages
+        id: deployment
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/deploy-pages@v4
 
       # STAGE 21: PUBLISH GITHUB ACTION SUMMARY
       - name: 📢 Stage 21: Publish GitHub Action Summary
         if: always()
         run: |
-          cat "Test Results/Summary/summary.md" >> $GITHUB_STEP_SUMMARY
+          cat "Test Results/Summary/summary.md" >> $GITHUB_STEP_SUMMARY || true

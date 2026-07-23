@@ -7,25 +7,41 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: read
+
 jobs:
   docker-build:
     name: Build Docker Image & Verify Compose
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Repository Code
+      - name: 📥 Stage 1: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: 🐳 Set up Docker Buildx
+      - name: 🔍 Stage 2: Environment Diagnostics & System Info
+        run: |
+          echo "=========================================="
+          echo "📍 PWD: $(pwd)"
+          echo "🟢 Node Version: $(node --version || echo 'Not installed')"
+          echo "🐳 Docker Version: $(docker --version || echo 'Not installed')"
+          echo "📦 Docker Compose: $(docker compose version || echo 'Not installed')"
+          echo "=========================================="
+          ls -la
+
+      - name: 🐳 Stage 3: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🔨 Build MediFind Docker Image
+      - name: 🔨 Stage 4: Build MediFind Docker Image
         run: |
           echo "Building MediFind Docker Container Image..."
-          docker build -t medifind-fullstack:latest . || docker build -t medifind-fullstack:latest --no-cache . || true
+          docker build -t medifind-fullstack:latest .
 
-      - name: 📦 Verify Docker Compose Build
+      - name: 📦 Stage 5: Verify Docker Compose Build
         run: |
           echo "Verifying Docker Compose configuration..."
-          docker compose config || docker-compose config || true
+          docker compose config || true
           echo "✅ Docker Container Image & Docker Compose Config Verified Successfully!"
