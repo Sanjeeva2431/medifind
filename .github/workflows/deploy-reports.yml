@@ -1,10 +1,8 @@
 name: Deploy Reports to GitHub Pages
 
 on:
-  workflow_run:
-    workflows: ["Android Appium E2E Automation Pipeline"]
-    types:
-      - completed
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
@@ -12,9 +10,13 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages-deploy"
+  cancel-in-progress: false
+
 jobs:
   deploy-reports:
-    name: Publish Latest & Historical Reports to GitHub Pages
+    name: Publish Full Test Cases & Reports to GitHub Pages
     runs-on: ubuntu-latest
 
     steps:
@@ -26,22 +28,36 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 📊 Generate Fresh Report Artifacts
+      - name: 📊 Generate All Test Suite Artifacts (470+ Test Cases)
         run: |
           python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
+          python3 scripts/generate_live_reports.py
           python3 scripts/generate_android_reports.py
 
-      - name: 📁 Prepare Deployment Directory
+      - name: 📁 Prepare Public Reports & App Directory Structure
         run: |
           mkdir -p public/reports/latest
           mkdir -p public/reports/history/build-${{ github.run_number }}
+          mkdir -p public/Test\ Results/Excel
+          mkdir -p public/Test\ Results/HTML
+          mkdir -p public/Test\ Results/JSON
 
+          # Copy main application assets
+          cp -r index.html js styles.css sw.js manifest.json assets public/ 2>/dev/null || cp -r index.html js styles.css sw.js public/
+
+          # Copy HTML reports to root level and reports folder
+          cp -r "Test Results/HTML/"* public/
           cp -r "Test Results/HTML/"* public/reports/latest/
           cp -r "Test Results/Summary/summary.md" public/reports/latest/ 2>/dev/null || true
           cp -r "Test Results/Screenshots" public/reports/latest/ 2>/dev/null || true
           cp -r "Test Results/Logs" public/reports/latest/ 2>/dev/null || true
 
-          cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/
+          # Copy Excel and JSON files
+          cp -r "Test Results/Excel/"* "public/Test Results/Excel/" 2>/dev/null || true
+          cp -r "Test Results/JSON/"* "public/Test Results/JSON/" 2>/dev/null || true
+
+          # Copy to history build folder
+          cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/ 2>/dev/null || true
 
       - name: 🚀 Deploy to gh-pages Branch
         uses: JamesIves/github-pages-deploy-action@v4
