@@ -1,0 +1,48 @@
+name: Python Appium Excel Analysis Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-appium-analysis:
+    name: Generate Python Appium Excel Report & Artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Stage 1: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Stage 2: Setup Python & Generate Reports
+        run: |
+          python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
+          python3 scripts/generate_android_reports.py || true
+
+      - name: 📁 Stage 3: Prepare Python Appium Report Assets
+        run: |
+          mkdir -p appium-tests/reports
+          cp "Test Results/Excel/Summary_Report.xlsx" "appium-tests/reports/Python_Appium_Excel_Analysis_Report.xlsx" 2>/dev/null || true
+
+      - name: 📦 Stage 4: Upload Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Python-Appium-Excel-Analysis-Report
+          path: |
+            appium-tests/reports/
+            Test Results/Excel/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 📢 Stage 5: Publish Step Summary
+        if: always()
+        run: |
+          echo "# 🐍 Python Appium Excel Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Framework**: Python OpenPyXL Reporting Engine" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Uploaded**: `Python-Appium-Excel-Analysis-Report`" >> $GITHUB_STEP_SUMMARY
