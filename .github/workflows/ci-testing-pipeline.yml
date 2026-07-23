@@ -56,10 +56,55 @@ jobs:
       - name: 📱 Run Appium Mobile E2E Test Suite
         run: npm run test:appium || true
 
-      - name: 📊 Generate Security Audit Excel Files
-        run: python3 scripts/generate_excel_audit.py || true
+      - name: 📊 Generate All Test & Security Audit Excel Files
+        run: |
+          python3 scripts/generate_android_reports.py || true
+          python3 scripts/generate_live_reports.py || true
+          python3 scripts/generate_excel_audit.py || true
 
-      - name: 📊 Upload Excel Analysis Reports as GitHub Actions Artifacts
+      - name: 📦 Stage 1: Upload Appium Mobile Excel Analysis Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Appium-Mobile-Excel-Analysis-Report
+          path: |
+            appium-tests/reports/
+            Test Results/Excel/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 📦 Stage 2: Upload Baseline Load Test Excel Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Baseline-Load-Test-Excel-Report
+          path: Vulnerability Test Results/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 📦 Stage 3: Upload Python Appium Excel Analysis Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Python-Appium-Excel-Analysis-Report
+          path: |
+            appium-tests/reports/
+            Test Results/Excel/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 📦 Stage 4: Upload Selenium Web Excel Analysis Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Selenium-Web-Excel-Analysis-Report
+          path: |
+            selenium-tests/reports/
+            Test Results/Excel/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 📦 Stage 5: Upload Consolidated MediFind Test Reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,5 +113,6 @@ jobs:
             selenium-tests/reports/
             appium-tests/reports/
             Vulnerability Test Results/*.xlsx
+            Test Results/
           if-no-files-found: ignore
           retention-days: 30
