@@ -35,11 +35,11 @@ jobs:
       - name: 🟢 Stage 2: Dependency Installation
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
       - run: |
           npm install
           cd automation && npm install && cd ..
-          python3 -m pip install openpyxl
+          python3 -m pip install openpyxl --break-system-packages || pip install openpyxl || true
 
       # STAGE 3: BUILD APPLICATION
       - name: 🔨 Stage 3: Build Application
