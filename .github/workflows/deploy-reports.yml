@@ -1,0 +1,49 @@
+name: Deploy Reports to GitHub Pages
+
+on:
+  workflow_run:
+    workflows: ["Android Appium E2E Automation Pipeline"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  deploy-reports:
+    name: Publish Latest & Historical Reports to GitHub Pages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📊 Generate Fresh Report Artifacts
+        run: |
+          python3 scripts/generate_android_reports.py
+
+      - name: 📁 Prepare Deployment Directory
+        run: |
+          mkdir -p public/reports/latest
+          mkdir -p public/reports/history/build-${{ github.run_number }}
+
+          cp -r "Test Results/HTML/"* public/reports/latest/
+          cp -r "Test Results/Summary/summary.md" public/reports/latest/ 2>/dev/null || true
+          cp -r "Test Results/Screenshots" public/reports/latest/ 2>/dev/null || true
+          cp -r "Test Results/Logs" public/reports/latest/ 2>/dev/null || true
+
+          cp -r public/reports/latest/* public/reports/history/build-${{ github.run_number }}/
+
+      - name: 🚀 Deploy to gh-pages Branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: public
+          branch: gh-pages

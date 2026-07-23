@@ -67,8 +67,9 @@ async function runMasterAppiumSuite() {
     console.log(`=======================================================`);
     console.log(`📁 EXCEL REPORT GENERATED SUCCESSFULLY`);
     console.log(`=======================================================`);
-    console.log(`📄 Latest File : ${reportInfo.latestFilePath}`);
-    console.log(`📄 Timestamped : ${reportInfo.filePath}`);
+    console.log(`📄 Appium Folder Report : ${reportInfo.latestFilePath}`);
+    console.log(`📄 Timestamped Copy     : ${reportInfo.filePath}`);
+    console.log(`📄 Global Excel Folder  : ${reportInfo.globalExcelPath}`);
     console.log(`=======================================================\n`);
 }
 

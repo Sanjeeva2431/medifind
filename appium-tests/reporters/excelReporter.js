@@ -172,8 +172,15 @@ export async function generateExcelReport(results, outputDir) {
     const filePath = path.join(outputDir, fileName);
     const latestFilePath = path.join(outputDir, 'MediFind_Mobile_E2E_Report.xlsx');
 
+    const globalExcelDir = path.join(__dirname, '..', '..', 'Test Results', 'Excel');
+    if (!fs.existsSync(globalExcelDir)) {
+        fs.mkdirSync(globalExcelDir, { recursive: true });
+    }
+    const globalExcelPath = path.join(globalExcelDir, 'MediFind_Mobile_E2E_Report.xlsx');
+
     await workbook.xlsx.writeFile(filePath);
     await workbook.xlsx.writeFile(latestFilePath);
+    await workbook.xlsx.writeFile(globalExcelPath);
 
-    return { filePath, latestFilePath, fileName };
+    return { filePath, latestFilePath, globalExcelPath, fileName };
 }

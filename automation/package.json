@@ -1,14 +1,29 @@
 {
-  "name": "medifind-selenium-automation",
+  "name": "medifind-android-appium-automation",
   "version": "1.0.0",
-  "description": "Enterprise-Grade Selenium E2E Automation Framework for Live GitHub Pages Deployment",
-  "main": "runner.js",
+  "description": "Enterprise-Grade Android Appium E2E Mobile Automation Framework & CI/CD System for MediFind",
+  "main": "runners/masterRunner.js",
   "type": "module",
   "scripts": {
-    "test:live": "node runner.js"
+    "test:android": "node runners/masterRunner.js",
+    "test:appium": "node runners/masterRunner.js",
+    "build:apk": "node resources/build_apk.js",
+    "reports:generate": "python3 ../scripts/generate_android_reports.py"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
-    "selenium-webdriver": "^4.19.0"
-  }
+    "appium": "^2.5.1",
+    "webdriverio": "^8.32.4"
+  },
+  "keywords": [
+    "appium",
+    "android",
+    "automation",
+    "e2e",
+    "testing",
+    "mobile",
+    "github-pages",
+    "excel-report",
+    "html-report"
+  ]
 }
