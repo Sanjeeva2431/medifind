@@ -12,7 +12,7 @@ MediFind is a full-stack real-time medicine availability, price comparison, pres
 
 ## 🚀 Full-Stack Features Summary
 
-- **Role-Based Portals**: Customer, Pharmacy Owner, Delivery Partner, Admin Control Panel.
+- **Dedicated Customer Application**: Focused medicine search, price comparison, pharmacy discovery, prescription upload OCR, order checkout, and live GPS delivery tracking.
 - **Node.js Express REST API**: Auth JWT endpoints, Medicine catalog search & CRUD, Pharmacy management, Orders creation & status updates, Prescriptions, Admin analytics.
 - **Real-Time Engine**: Socket.IO websockets for instant live order status changes, driver location tracking, and stock notifications.
 - **Database Engine**: Mongoose OR fall-back memory engine populating 100+ medicines, 20 pharmacies, 50 users, 15 delivery partners.

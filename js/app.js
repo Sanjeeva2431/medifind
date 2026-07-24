@@ -87,14 +87,8 @@ class MediFindApp {
 
         if (this.state.currentRole === 'auth') {
             contentHtml = this.authService.renderLoginPage();
-        } else if (this.state.currentRole === 'customer') {
+        } else {
             contentHtml = this.customerModule.render();
-        } else if (this.state.currentRole === 'pharmacy') {
-            contentHtml = this.pharmacyModule.render();
-        } else if (this.state.currentRole === 'delivery') {
-            contentHtml = this.deliveryModule.render();
-        } else if (this.state.currentRole === 'admin') {
-            contentHtml = this.adminModule.render();
         }
 
         root.innerHTML = `
@@ -104,12 +98,10 @@ class MediFindApp {
         `;
 
         setTimeout(() => {
-            if (this.state.currentRole === 'pharmacy') this.pharmacyModule.initCharts();
-            if (this.state.currentRole === 'admin') this.adminModule.initCharts();
-            if (this.state.currentRole === 'customer' && this.state.customerTab === 'pharmacies') {
+            if (this.state.customerTab === 'pharmacies') {
                 googleMapsService.renderMapCanvas('nearbyPharmaciesMapCanvas', {
-                    pharmacies: MOCK_PHARMACIES,
-                    customerLoc: googleMapsService.getUserLocation()
+                    lat: 28.5355,
+                    lng: 77.3910
                 });
             }
         }, 100);
@@ -141,79 +133,54 @@ class MediFindApp {
         // Dynamic search filter handled in pharmacies page
     }
 
-    openRoleModal() {
+    openAccountModal() {
         const currentUser = this.authService.getUser();
         this.showModal(`
             <div class="modal-card">
                 <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="font-size:20px;">Role Portals & Account</h3>
-                    ${currentUser ? `<button class="btn-secondary" style="color:var(--emergency-red); padding:6px 12px; font-size:12px;" onclick="MediApp.logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout (${currentUser.name})</button>` : `<button class="add-cart-btn" style="padding:6px 12px; font-size:12px;" onclick="MediApp.openAuthModal('login')"><i class="fa-solid fa-key"></i> Login / Signup</button>`}
+                <div style="text-align:center; padding:12px 0 20px 0;">
+                    <div class="brand-icon" style="width:60px; height:60px; font-size:28px; margin:0 auto 12px auto;"><i class="fa-solid fa-user"></i></div>
+                    <h3 style="font-size:20px; font-weight:800;">${currentUser ? currentUser.name : 'Guest User'}</h3>
+                    <p style="font-size:13px; color:var(--text-muted);">${currentUser ? currentUser.email : 'Customer Account'}</p>
                 </div>
-                <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Switch between 4 role-protected portals:</p>
                 
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="padding:14px; border:2px solid ${this.state.currentRole === 'customer' ? 'var(--primary)' : 'var(--card-border)'}; border-radius:var(--radius-md); cursor:pointer; display:flex; align-items:center; gap:12px;"
-                         onclick="MediApp.switchRole('customer')">
-                        <i class="fa-solid fa-user" style="font-size:24px; color:var(--primary);"></i>
-                        <div>
-                            <div style="font-weight:700;">Customer Portal</div>
-                            <div style="font-size:12px; color:var(--text-muted);">Search medicines, compare prices, order & track live</div>
-                        </div>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                    <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.setCustomerTab('orders'); MediApp.closeModal();">
+                        <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-box" style="color:var(--primary);"></i> <span>My Orders</span></div>
+                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
                     </div>
-                    <div style="padding:14px; border:2px solid ${this.state.currentRole === 'pharmacy' ? 'var(--primary)' : 'var(--card-border)'}; border-radius:var(--radius-md); cursor:pointer; display:flex; align-items:center; gap:12px;"
-                         onclick="MediApp.switchRole('pharmacy')">
-                        <i class="fa-solid fa-store" style="font-size:24px; color:var(--secondary);"></i>
-                        <div>
-                            <div style="font-weight:700;">Pharmacy Owner Dashboard</div>
-                            <div style="font-size:12px; color:var(--text-muted);">Inventory stock, sales analytics, prescription approval</div>
-                        </div>
+                    <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.openAddressModal(); MediApp.closeModal();">
+                        <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-location-dot" style="color:var(--secondary);"></i> <span>Saved Addresses</span></div>
+                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
                     </div>
-                    <div style="padding:14px; border:2px solid ${this.state.currentRole === 'delivery' ? 'var(--primary)' : 'var(--card-border)'}; border-radius:var(--radius-md); cursor:pointer; display:flex; align-items:center; gap:12px;"
-                         onclick="MediApp.switchRole('delivery')">
-                        <i class="fa-solid fa-motorcycle" style="font-size:24px; color:var(--warning-amber);"></i>
-                        <div>
-                            <div style="font-weight:700;">Delivery Partner Dashboard</div>
-                            <div style="font-size:12px; color:var(--text-muted);">Active orders map navigation & OTP verification</div>
-                        </div>
-                    </div>
-                    <div style="padding:14px; border:2px solid ${this.state.currentRole === 'admin' ? 'var(--primary)' : 'var(--card-border)'}; border-radius:var(--radius-md); cursor:pointer; display:flex; align-items:center; gap:12px;"
-                         onclick="MediApp.switchRole('admin')">
-                        <i class="fa-solid fa-user-shield" style="font-size:24px; color:#0284c7;"></i>
-                        <div>
-                            <div style="font-weight:700;">Admin Control Panel</div>
-                            <div style="font-size:12px; color:var(--text-muted);">Platform statistics, pharmacy approval & user management</div>
-                        </div>
+                    <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.setCustomerTab('prescription'); MediApp.closeModal();">
+                        <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-file-prescription" style="color:#0284c7;"></i> <span>Uploaded Prescriptions</span></div>
+                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
                     </div>
                 </div>
+
+                ${currentUser ? `
+                    <button class="btn-secondary" style="width:100%; justify-content:center; padding:12px; color:var(--emergency-red); font-weight:700;" onclick="MediApp.logout()">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout Account
+                    </button>
+                ` : `
+                    <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px;" onclick="MediApp.setAuthMode('login'); MediApp.closeModal();">
+                        <i class="fa-solid fa-right-to-bracket"></i> Sign In to Account
+                    </button>
+                `}
             </div>
         `);
     }
 
-    switchRole(role) {
-        // Enforce route protection
-        if (!this.authService.canAccessRole(role)) {
-            this.showModal(`
-                <div class="modal-card" style="text-align:center; padding:24px;">
-                    <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                    <div style="width:56px; height:56px; background:var(--emergency-light); color:var(--emergency-red); border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px auto;">
-                        <i class="fa-solid fa-lock"></i>
-                    </div>
-                    <h3 style="font-size:18px; margin-bottom:6px;">Role Access Restricted (403)</h3>
-                    <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">You need a <strong>${role.toUpperCase()}</strong> account to access this dashboard.</p>
-                    <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px;" onclick="MediApp.openAuthModal('login', '${role}')">
-                        <i class="fa-solid fa-right-to-bracket"></i> Login as ${role.toUpperCase()}
-                    </button>
-                </div>
-            `);
-            return;
-        }
+    openRoleModal() {
+        this.openAccountModal();
+    }
 
-        this.state.currentRole = role;
+    switchRole(role) {
+        this.state.currentRole = 'customer';
         this.closeModal();
         this.render();
-        this.showToast(`Switched to ${role.toUpperCase()} View`);
-    }
+    };
 
     setAuthMode(mode) {
         this.state.authMode = mode;

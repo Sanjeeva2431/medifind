@@ -48,8 +48,8 @@ export class CustomerModule {
                 </div>
 
                 <div class="top-actions">
-                    <button class="role-badge-btn" onclick="MediApp.openRoleModal()">
-                        <i class="fa-solid fa-user-gear"></i> Role: CUSTOMER
+                    <button class="role-badge-btn" onclick="MediApp.openAccountModal()">
+                        <i class="fa-solid fa-user"></i> Account
                     </button>
                     <button class="icon-btn" onclick="MediApp.toggleTheme()" title="Toggle Dark/Light Mode">
                         <i class="fa-solid ${this.app.state.darkMode ? 'fa-sun' : 'fa-moon'}"></i>

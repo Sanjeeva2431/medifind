@@ -109,25 +109,12 @@ export class AuthService {
 
     // 5. Role Redirection Matrix
     getRedirectTabForRole(role) {
-        switch (role) {
-            case 'pharmacy':
-                return { role: 'pharmacy', tab: 'dashboard' };
-            case 'delivery':
-                return { role: 'delivery', tab: 'tasks' };
-            case 'admin':
-                return { role: 'admin', tab: 'overview' };
-            case 'customer':
-            default:
-                return { role: 'customer', tab: 'home' };
-        }
+        return { role: 'customer', tab: 'home' };
     }
 
     // 6. Route Protection Guard
     canAccessRole(requestedRole) {
-        if (!this.isAuthenticated()) return false;
-        const currentRole = this.getRole();
-        if (currentRole === 'admin') return true; // Admin can access all portals
-        return currentRole === requestedRole;
+        return true;
     }
 
     // 7. Authentication Landing Page UI Renderer
@@ -146,8 +133,8 @@ export class AuthService {
                         Order genuine medicines from verified nearby pharmacies with live GPS driver tracking.
                     </p>
 
-                    <!-- 3 Primary Pathways -->
-                    <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:28px;">
+                    <!-- Primary Pathways -->
+                    <div style="display:flex; flex-direction:column; gap:12px;">
                         <button class="add-cart-btn" style="width:100%; justify-content:center; padding:14px; font-size:15px;" onclick="MediApp.setAuthMode('login')">
                             <i class="fa-solid fa-right-to-bracket"></i> Sign In to Account
                         </button>
@@ -159,17 +146,6 @@ export class AuthService {
                         <button class="btn-secondary" style="width:100%; justify-content:center; padding:12px; font-size:14px; border:1.5px solid var(--card-border);" onclick="MediApp.continueAsGuest()">
                             <i class="fa-solid fa-user-clock"></i> Continue as Guest
                         </button>
-                    </div>
-
-                    <!-- 4 System Roles Card -->
-                    <div style="background:var(--background); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; text-align:left;">
-                        <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">SUPPORTED PLATFORM ROLES</div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; font-weight:700;">
-                            <div style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-user" style="color:var(--primary);"></i> Customer</div>
-                            <div style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-store" style="color:var(--secondary);"></i> Pharmacy</div>
-                            <div style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-motorcycle" style="color:#f97316;"></i> Delivery Driver</div>
-                            <div style="display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-shield-halved" style="color:#8b5cf6;"></i> Admin</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -189,27 +165,17 @@ export class AuthService {
                         <button class="btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="MediApp.setAuthMode('landing')">
                             <i class="fa-solid fa-arrow-left"></i> Back to Landing
                         </button>
-                        <span style="font-size:11px; font-weight:800; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full);">FIREBASE AUTH</span>
+                        <span style="font-size:11px; font-weight:800; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full);">AUTHENTICATION</span>
                     </div>
 
                     <div style="text-align:center; margin-bottom:24px;">
                         <div class="brand-icon" style="width:56px; height:56px; font-size:26px; margin:0 auto 12px auto;"><i class="fa-solid fa-notes-medical"></i></div>
                         <h2 style="font-size:24px; font-weight:800;">Welcome Back to MediFind</h2>
-                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Sign in to access your healthcare portal</p>
+                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Sign in to order medicines & track deliveries</p>
                     </div>
 
                     <form onsubmit="event.preventDefault(); MediApp.handleLoginFormSubmit(this);">
                         <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:20px;">
-                            <div>
-                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">ACCOUNT ROLE</label>
-                                <select id="authRoleSelect" style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px; font-weight:700; background:var(--background);">
-                                    <option value="customer">Customer (Patient)</option>
-                                    <option value="pharmacy">Pharmacy Store Owner</option>
-                                    <option value="delivery">Delivery Fleet Driver</option>
-                                    <option value="admin">Platform Admin</option>
-                                </select>
-                            </div>
-
                             <div>
                                 <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">EMAIL ADDRESS</label>
                                 <input type="email" id="authEmail" placeholder="alex@example.com" value="alex@example.com" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
@@ -257,16 +223,6 @@ export class AuthService {
 
                     <form onsubmit="event.preventDefault(); MediApp.handleSignupFormSubmit(this);">
                         <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
-                            <div>
-                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">REGISTER AS ROLE</label>
-                                <select id="signupRole" style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px; font-weight:700; background:var(--background);">
-                                    <option value="customer">Customer / Patient</option>
-                                    <option value="pharmacy">Pharmacy Store Owner</option>
-                                    <option value="delivery">Delivery Fleet Driver</option>
-                                    <option value="admin">Platform Admin</option>
-                                </select>
-                            </div>
-
                             <div>
                                 <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">FULL NAME</label>
                                 <input type="text" id="signupName" placeholder="Dr. S. K. Gupta or Alex Johnson" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">

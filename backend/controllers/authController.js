@@ -20,7 +20,7 @@ export const authController = (userStore) => ({
             email,
             password, // In production, bcrypt hash password
             phone: phone || '+91 98765 43210',
-            role: role || 'customer',
+            role: 'customer',
             address: address || 'Sector 18, Noida'
         };
 
