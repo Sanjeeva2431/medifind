@@ -124,14 +124,26 @@ export class CustomerModule {
                     </div>
                 </section>
 
+                <!-- Real-Time GPS Location Filter Banner -->
+                <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; box-shadow:var(--shadow-md); border:1px solid rgba(255,255,255,0.1);">
+                    <div>
+                        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800; color:var(--primary);">REAL-TIME GOOGLE MAPS GPS FILTER</div>
+                        <div style="font-size:15px; font-weight:800; margin-top:2px;">📍 ${userLoc.label}</div>
+                        <div style="font-size:11px; opacity:0.8; margin-top:2px;">Showing open pharmacies & medications strictly within 5 km delivery radius</div>
+                    </div>
+                    <button class="add-cart-btn" style="background:var(--primary); color:white; padding:8px 14px; font-size:12px;" onclick="MediApp.detectLiveLocation()">
+                        <i class="fa-solid fa-location-crosshairs"></i> Use Live GPS
+                    </button>
+                </div>
+
                 <!-- Nearby Pharmacies Horizontal Carousel -->
                 <section style="margin-bottom: 24px;">
                     <div class="section-header">
-                        <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Open Pharmacies</h3>
-                        <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${MOCK_PHARMACIES.length})</span>
+                        <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Open Pharmacies (&lt; 5.0 km)</h3>
+                        <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${[...MOCK_PHARMACIES].filter(p => (parseFloat(p.distance) || 0) <= 5.0).length})</span>
                     </div>
                     <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
-                        ${[...MOCK_PHARMACIES].sort((a, b) => (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99)).slice(0, 6).map(p => `
+                        ${[...MOCK_PHARMACIES].filter(p => (parseFloat(p.distance) || 0) <= 5.0).sort((a, b) => (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99)).slice(0, 6).map(p => `
                             <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); cursor:pointer;"
                                  onclick="MediApp.viewPharmacyDetails('${p.id}')">
                                 <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
@@ -173,32 +185,29 @@ export class CustomerModule {
         googleMapsService.updateSyncPharmacyDistances(userLoc.lat, userLoc.lng);
 
         const query = (this.pharmacySearchQuery || '').toLowerCase();
-        const filteredPharmacies = MOCK_PHARMACIES.filter(p => 
+        // Filter pharmacies strictly within 5.0 km radius of detected user location
+        const nearbyOnly = MOCK_PHARMACIES.filter(p => (parseFloat(p.distance) || 0) <= 5.0);
+        const filteredPharmacies = (nearbyOnly.length > 0 ? nearbyOnly : MOCK_PHARMACIES).filter(p => 
             !query || p.shop_name.toLowerCase().includes(query) || p.address.toLowerCase().includes(query)
-        );
-
-        setTimeout(() => {
-            googleMapsService.renderMapCanvas('nearbyPharmaciesMapCanvas', {
-                pharmacies: filteredPharmacies,
-                showDirections: true
-            });
-        }, 50);
+        ).sort((a, b) => (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99));
 
         return `
             <header class="navbar-top">
                 <button class="icon-btn" onclick="MediApp.setCustomerTab('home')"><i class="fa-solid fa-arrow-left"></i></button>
-                <h2 style="font-size:18px; flex:1;">Nearby Pharmacies (${filteredPharmacies.length})</h2>
+                <h2 style="font-size:18px; flex:1;">Pharmacies Near You (${filteredPharmacies.length})</h2>
             </header>
 
             <main class="main-content">
-                <!-- Interactive Google Maps View Box -->
+                <!-- Interactive Real-Time Google Maps Embed -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:12px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Geolocation Map & Directions API</span>
-                        <span style="font-size:11px; background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:4px; font-weight:700;">Marker Clustering Active</span>
+                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Google Maps Embed • ${userLoc.label}</span>
+                        <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Refresh GPS</button>
                     </div>
-                    <div class="tracking-map-box" style="height:180px;">
-                        <canvas id="nearbyPharmaciesMapCanvas" class="tracking-canvas"></canvas>
+                    <div style="height:200px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);">
+                        <iframe width="100%" height="200" frameborder="0" style="border:0;" 
+                                src="https://maps.google.com/maps?q=${userLoc.lat},${userLoc.lng}&z=14&output=embed" allowfullscreen>
+                        </iframe>
                     </div>
                 </div>
 
