@@ -23,7 +23,10 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('⚡ MediFind Service Worker Registered for Production Caching:', reg.scope))
+                    .then(reg => {
+                        reg.update();
+                        console.log('⚡ MediFind Service Worker Registered:', reg.scope);
+                    })
                     .catch(err => console.log('Service Worker Registration Fallback:', err));
             });
         }
