@@ -1187,15 +1187,33 @@ class MediFindApp {
         }
     }
 
-    setManualLocationFromInput() {
+    async setManualLocationFromInput() {
         const val = document.getElementById('manualLocationInput')?.value?.trim();
         if (!val) {
             this.showToast('Please enter an address or city name.');
             return;
         }
-        googleMapsService.setManualLocation(val);
+        this.showToast(`🔍 Locating "${val}"...`);
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    const lat = parseFloat(parseFloat(data[0].lat).toFixed(4));
+                    const lng = parseFloat(parseFloat(data[0].lon).toFixed(4));
+                    const displayLabel = data[0].display_name.split(',').slice(0, 2).join(', ');
+                    googleMapsService.setManualLocation(displayLabel || val, lat, lng);
+                } else {
+                    googleMapsService.setManualLocation(val);
+                }
+            } else {
+                googleMapsService.setManualLocation(val);
+            }
+        } catch (e) {
+            googleMapsService.setManualLocation(val);
+        }
         this.closeModal();
-        this.showToast(`📍 Location updated to "${val}"`);
+        this.showToast(`📍 Real-Time Location Updated: "${val}"`);
         this.render();
     }
 
