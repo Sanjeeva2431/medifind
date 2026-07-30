@@ -62,6 +62,7 @@ class MediFindApp {
 
     init() {
         window.MediApp = this;
+        this.state.cart = []; // Reset cart on app startup
 
         // Auto-check authentication
         if (this.authService.isAuthenticated()) {
@@ -191,6 +192,7 @@ class MediFindApp {
         this.state.isGuest = true;
         this.state.currentRole = 'customer';
         this.state.customerTab = 'home';
+        this.state.cart = []; // Reset cart for guest
         this.showToast('👤 Browsing as Guest User');
         this.render();
     }
@@ -248,6 +250,7 @@ class MediFindApp {
         if (res.success) {
             const target = this.authService.getRedirectTabForRole(role);
             this.state.currentRole = target.role;
+            this.state.cart = []; // Reset cart on signup
             this.showToast(`🎉 Registration Successful! Welcome ${name}`);
             this.render();
         } else {

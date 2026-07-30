@@ -165,6 +165,9 @@ export class AuthService {
         } else {
             sessionStorage.setItem('medifind_auth_user', data);
         }
+        if (this.app && this.app.state) {
+            this.app.state.cart = [];
+        }
     }
 
     // 5. Role Redirection Matrix
