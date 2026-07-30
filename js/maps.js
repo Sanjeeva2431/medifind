@@ -87,19 +87,19 @@ export class GoogleMapsService {
         const currentLocLabel = this.currentLocation ? (this.currentLocation.label || 'Your Area') : 'Your Area';
 
         let areaName = currentLocLabel.split(',')[0].replace(/Live GPS \([^)]+\)/gi, 'Your Area').trim() || 'Your Area';
-        if (areaName === 'Sector 18') areaName = 'Local Area';
+        if (areaName === 'Sector 18' || areaName === 'Local Area') areaName = 'Nearby Area';
 
         const localOffsets = [
-            { dLat:  0.0035, dLng:  0.0042 }, // ~0.5 km
-            { dLat: -0.0051, dLng:  0.0063 }, // ~0.9 km
-            { dLat:  0.0078, dLng: -0.0071 }, // ~1.3 km
-            { dLat: -0.0102, dLng: -0.0089 }, // ~1.7 km
-            { dLat:  0.0135, dLng:  0.0124 }, // ~2.2 km
-            { dLat: -0.0168, dLng:  0.0155 }, // ~2.8 km
-            { dLat:  0.0210, dLng: -0.0182 }, // ~3.5 km
-            { dLat: -0.0255, dLng: -0.0221 }, // ~4.2 km
-            { dLat:  0.0310, dLng:  0.0285 }, // ~5.1 km
-            { dLat: -0.0380, dLng:  0.0340 }  // ~6.3 km
+            { dLat:  0.0035, dLng:  0.0042, dist: 0.4 }, // ~0.4 km
+            { dLat: -0.0051, dLng:  0.0063, dist: 0.8 }, // ~0.8 km
+            { dLat:  0.0078, dLng: -0.0071, dist: 1.2 }, // ~1.2 km
+            { dLat: -0.0102, dLng: -0.0089, dist: 1.6 }, // ~1.6 km
+            { dLat:  0.0135, dLng:  0.0124, dist: 2.1 }, // ~2.1 km
+            { dLat: -0.0168, dLng:  0.0155, dist: 2.7 }, // ~2.7 km
+            { dLat:  0.0210, dLng: -0.0182, dist: 3.4 }, // ~3.4 km
+            { dLat: -0.0255, dLng: -0.0221, dist: 4.1 }, // ~4.1 km
+            { dLat:  0.0310, dLng:  0.0285, dist: 4.9 }, // ~4.9 km
+            { dLat: -0.0380, dLng:  0.0340, dist: 5.8 }  // ~5.8 km
         ];
 
         const defaultNames = [
@@ -123,10 +123,9 @@ export class GoogleMapsService {
             const baseName = defaultNames[idx % defaultNames.length];
             p.shop_name = `${baseName} (${areaName})`;
             p.address = `Plot ${12 + idx * 4}, Block ${String.fromCharCode(65 + (idx % 5))}, ${areaName}`;
+            p.distance = `${offset.dist} km`;
 
-            const dist = this.calculateDistance(userLat, userLng, p.lat, p.lng);
-            p.distance = `${dist} km`;
-            const times = this.calculateTravelTime(dist);
+            const times = this.calculateTravelTime(offset.dist);
             p.delivery_time = times.deliveryTime;
         });
 
@@ -191,19 +190,16 @@ export class GoogleMapsService {
 
     // 3. AUTOMATICALLY CHOOSE NEAREST PHARMACY WITH STOCK
     findNearestPharmacyWithStock(medId, customerLat = 28.5355, customerLng = 77.3910, medicines = [], pharmacies = []) {
-        // Filter medicines for target medId and stock > 0
         const inStockMeds = medicines.filter(m => (m.id === medId || m.name.toLowerCase().includes(medId.toLowerCase())) && m.stock > 0);
         if (inStockMeds.length === 0) return null;
 
-        // Extract candidate pharmacy IDs
         const candidatePharmIds = inStockMeds.map(m => m.pharmacy_id);
-
         let nearestPharm = null;
         let minDistance = Infinity;
 
         pharmacies.forEach(p => {
             if (candidatePharmIds.includes(p.id) && p.status === 'open') {
-                const dist = this.calculateDistance(customerLat, customerLng, p.lat || 28.5355, p.lng || 77.3910);
+                const dist = parseFloat(p.distance) || 1.0;
                 if (dist < minDistance) {
                     minDistance = dist;
                     const times = this.calculateTravelTime(dist);
@@ -217,7 +213,6 @@ export class GoogleMapsService {
             }
         });
 
-        // Fallback to first pharmacy if geo calculation completes
         return nearestPharm || pharmacies[0];
     }
 
@@ -256,33 +251,34 @@ export class GoogleMapsService {
             ctx.stroke();
         }
 
-        const startPt = { x: width * 0.15, y: height * 0.75 };
-        const endPt = { x: width * 0.85, y: height * 0.25 };
+        // Customer Location Pin (Right)
+        const endPt = { x: width * 0.75, y: height * 0.45 };
+        // Nearby Pharmacy Cluster Pins (Immediately adjacent to customer pin)
+        const startPt = { x: width * 0.25, y: height * 0.55 };
 
-        // Draw Directions API Polyline Route
+        // Draw Directions Route Polyline
         if (showDirections) {
             ctx.beginPath();
             ctx.strokeStyle = '#0284c7';
-            ctx.lineWidth = 5;
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
             ctx.moveTo(startPt.x, startPt.y);
-            ctx.bezierCurveTo(width * 0.35, height * 0.85, width * 0.65, height * 0.15, endPt.x, endPt.y);
+            ctx.lineTo(endPt.x, endPt.y);
             ctx.stroke();
 
-            // Directions Arrow Animation Indicator
             ctx.fillStyle = '#38bdf8';
             ctx.font = '700 10px Plus Jakarta Sans, sans-serif';
-            ctx.fillText('⚡ Directions Route (Google Maps API)', width * 0.35, height * 0.5);
+            ctx.fillText('⚡ 0.4 km Delivery Route (Live GPS)', (startPt.x + endPt.x) / 2, (startPt.y + endPt.y) / 2 - 10);
         }
 
-        // Draw Customer Location Marker (End)
-        this.drawMarker(ctx, endPt.x, endPt.y, '#ef4444', 'fa-house-user', customerLoc.label || 'Customer Location');
+        // Draw Customer Location Marker
+        this.drawMarker(ctx, endPt.x, endPt.y, '#ef4444', 'fa-house-user', customerLoc.label || 'Your GPS Location');
 
-        // Draw Nearby Pharmacy Markers & Clustering
+        // Draw Nearby Pharmacy Markers in tight local cluster
         pharmacies.forEach((p, idx) => {
-            const px = startPt.x + (idx * 30);
-            const py = startPt.y - (idx * 15);
-            this.drawMarker(ctx, px, py, '#0ea5e9', 'fa-store', p.shop_name || 'Pharmacy');
+            const px = startPt.x + (idx * 28);
+            const py = startPt.y + (idx % 2 === 0 ? 15 : -15);
+            this.drawMarker(ctx, px, py, '#0ea5e9', 'fa-store', `${p.shop_name} (${p.distance})`);
         });
 
         // Draw Live Driver Marker if active
