@@ -45,6 +45,32 @@ export class AuthService {
             await firestoreDb.createUser(newUser);
             this.setCurrentUser(newUser, true);
 
+            // Sync user directly into Supabase Postgres database
+            try {
+                const supabaseUrl = 'https://gixqpvojsyitkbgctlqz.supabase.co';
+                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHFwdm9qc3lpdGtiZ2N0bHF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3ODE5MDYsImV4cCI6MjEwMDM1NzkwNn0.0cIqXypO-lW8cJWbpztFN6nVPljTrgaPRIqeQUo850I';
+                fetch(`${supabaseUrl}/rest/v1/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({
+                        id: newUser.id,
+                        name: newUser.name,
+                        email: newUser.email,
+                        password: newUser.password,
+                        phone: newUser.phone,
+                        role: newUser.role,
+                        address: newUser.address
+                    })
+                }).catch(e => console.warn('[Supabase Direct Sync] Warning:', e));
+            } catch (e) {
+                console.warn('[Supabase Direct Sync] Network warning:', e);
+            }
+
             return { success: true, user: newUser, message: `Account created! Welcome ${name}.` };
         } catch (err) {
             console.error('[Firebase Auth] Signup Error:', err);
