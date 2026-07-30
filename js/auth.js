@@ -34,6 +34,7 @@ export class AuthService {
                 id: `usr_${Date.now()}`,
                 name,
                 email: email.toLowerCase(),
+                password,
                 phone: phone || '+91 98765 43210',
                 role,
                 address: address || 'Sector 18, Noida',
@@ -59,6 +60,10 @@ export class AuthService {
 
             if (!user) {
                 return { success: false, message: 'No account found with this email.' };
+            }
+
+            if (user.password && user.password !== password) {
+                return { success: false, message: 'Invalid password. Please check your credentials.' };
             }
 
             this.setCurrentUser(user, rememberMe);

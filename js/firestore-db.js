@@ -22,6 +22,13 @@ export class FirestoreDatabase {
 
     init() {
         seedFirestore(this);
+        // Load custom registered users from localStorage
+        try {
+            const savedCustomUsers = JSON.parse(localStorage.getItem('medifind_custom_users') || '[]');
+            savedCustomUsers.forEach(u => this.collections.Users.set(u.id, u));
+        } catch (e) {
+            console.error('[Firestore DB] Error restoring saved custom users:', e);
+        }
         this.initialized = true;
     }
 
@@ -30,8 +37,22 @@ export class FirestoreDatabase {
         return this.collections.Users.get(id) || null;
     }
     async createUser(userData) {
-        this.collections.Users.set(userData.id, { ...userData, created_at: new Date().toISOString() });
-        return userData;
+        const userObj = { ...userData, created_at: userData.created_at || new Date().toISOString() };
+        this.collections.Users.set(userData.id, userObj);
+        try {
+            const savedCustomUsers = JSON.parse(localStorage.getItem('medifind_custom_users') || '[]');
+            // Replace if already exists or push new
+            const idx = savedCustomUsers.findIndex(u => u.id === userObj.id || u.email.toLowerCase() === userObj.email.toLowerCase());
+            if (idx >= 0) {
+                savedCustomUsers[idx] = userObj;
+            } else {
+                savedCustomUsers.push(userObj);
+            }
+            localStorage.setItem('medifind_custom_users', JSON.stringify(savedCustomUsers));
+        } catch (e) {
+            console.error('[Firestore DB] Error persisting custom user:', e);
+        }
+        return userObj;
     }
 
     // 2. Pharmacies
