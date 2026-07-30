@@ -125,10 +125,10 @@ export class CustomerModule {
                 <section style="margin-bottom: 24px;">
                     <div class="section-header">
                         <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Open Pharmacies</h3>
-                        <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (20)</span>
+                        <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${MOCK_PHARMACIES.length})</span>
                     </div>
                     <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
-                        ${MOCK_PHARMACIES.slice(0, 4).map(p => `
+                        ${[...MOCK_PHARMACIES].sort((a, b) => (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99)).slice(0, 6).map(p => `
                             <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); cursor:pointer;"
                                  onclick="MediApp.viewPharmacyDetails('${p.id}')">
                                 <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">

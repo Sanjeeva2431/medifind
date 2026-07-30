@@ -86,8 +86,18 @@ export class IntelligentSearchEngine {
             }
         });
 
-        // Sort results by similarity score descending, then by stock availability
-        matches.sort((a, b) => b.score - a.score || b.med.stock - a.med.stock);
+        // Sort results by similarity score descending, then by pharmacy distance ascending, then by stock availability
+        matches.sort((a, b) => {
+            if (Math.abs(b.score - a.score) > 0.05) {
+                return b.score - a.score;
+            }
+            const distA = parseFloat(a.med.pharmacy_distance) || 99;
+            const distB = parseFloat(b.med.pharmacy_distance) || 99;
+            if (distA !== distB) {
+                return distA - distB;
+            }
+            return b.med.stock - a.med.stock;
+        });
         const results = matches.map(m => m.med);
 
         // 4. Generate Alternative Recommendations if result list is empty or primary items are out of stock

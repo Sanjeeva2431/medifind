@@ -59,6 +59,18 @@ class MediFindApp {
             this.state.authMode = 'landing';
         }
 
+        // Auto-detect browser GPS location and recalculate distances
+        if (navigator.geolocation) {
+            import('./maps.js').then(({ googleMapsService }) => {
+                googleMapsService.requestBrowserLocation().then(res => {
+                    if (res.success) {
+                        this.showToast('📍 Exact GPS Location Detected & Medications Sorted by Distance!');
+                        this.render();
+                    }
+                });
+            });
+        }
+
         this.render();
         this.showToast('MediFind Application Ready 🏥');
     }
