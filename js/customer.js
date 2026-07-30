@@ -441,7 +441,10 @@ export class CustomerModule {
                     </div>
                 ` : `
                     <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:20px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                        <h3 style="font-size:16px; margin-bottom:14px;">Items in Cart</h3>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:16px;">Items in Cart</h3>
+                            <button class="btn-secondary" style="font-size:11px; padding:4px 8px; color:var(--emergency-red);" onclick="MediApp.clearCart()"><i class="fa-solid fa-trash"></i> Clear All</button>
+                        </div>
                         <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:20px;">
                             ${this.app.state.cart.map(item => `
                                 <div style="display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--card-border); padding-bottom:12px;">

@@ -46,7 +46,8 @@ class MediFindApp {
 
     init() {
         window.MediApp = this;
-        this.state.cart = []; // Reset cart on app startup
+        this.state.cart = [];
+        this.state.orders = [];
 
         // Auto-check authentication
         if (this.authService.isAuthenticated()) {
@@ -470,6 +471,12 @@ class MediFindApp {
         if (item.quantity <= 0) {
             this.state.cart = this.state.cart.filter(i => i.id !== medId);
         }
+        this.render();
+    }
+
+    clearCart() {
+        this.state.cart = [];
+        this.showToast('Shopping Cart Emptied 🛒');
         this.render();
     }
 
