@@ -122,7 +122,8 @@ export class AuthService {
         localStorage.removeItem('medifind_auth_user');
         sessionStorage.removeItem('medifind_auth_user');
         if (this.app) {
-            this.app.state.currentRole = 'customer';
+            this.app.state.currentRole = 'auth';
+            this.app.state.authMode = 'login';
             this.app.showToast('Logged out successfully');
             this.app.render();
         }

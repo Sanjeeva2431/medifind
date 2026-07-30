@@ -180,10 +180,12 @@ class MediFindApp {
         this.state.currentRole = 'customer';
         this.closeModal();
         this.render();
-    };
+    }
 
     setAuthMode(mode) {
+        this.state.currentRole = 'auth';
         this.state.authMode = mode;
+        this.closeModal();
         this.render();
     }
 
@@ -278,11 +280,11 @@ class MediFindApp {
     }
 
     logout() {
+        this.closeModal();
         this.authService.logout();
         this.state.isGuest = false;
         this.state.currentRole = 'auth';
-        this.state.authMode = 'landing';
-        this.showToast('Logged out successfully');
+        this.state.authMode = 'login';
         this.render();
     }
 
