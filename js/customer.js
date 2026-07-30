@@ -462,7 +462,11 @@ export class CustomerModule {
                         <!-- Delivery Address Input -->
                         <div style="margin-bottom:16px;">
                             <label style="font-size:12px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">DELIVERY ADDRESS</label>
-                            <input type="text" id="deliveryAddressInput" value="Flat 402, Block B, Sector 18, Noida" 
+                            <input type="text" id="deliveryAddressInput" value="${(() => {
+                                const u = this.app.authService.getUser();
+                                if (!u || !u.address) return 'Flat 402, Block B, Sector 18, Noida';
+                                return typeof u.address === 'string' ? u.address : `${u.address.street || ''}, ${u.address.city || ''}`;
+                            })()}" 
                                    style="width:100%; border:1px solid var(--card-border); padding:10px 14px; border-radius:var(--radius-md); font-size:13px;">
                         </div>
 
@@ -652,6 +656,19 @@ export class CustomerModule {
     }
 
     renderOrdersPage() {
+        const currentUser = this.app.authService.getUser();
+        let userOrders = [];
+
+        if (currentUser) {
+            userOrders = this.app.state.orders.filter(o => 
+                o.user_id === currentUser.id || 
+                o.customer_id === currentUser.id || 
+                (o.customer_email && o.customer_email.toLowerCase() === currentUser.email.toLowerCase())
+            );
+        } else {
+            userOrders = this.app.state.orders.filter(o => o.user_id && o.user_id.startsWith('usr_guest_'));
+        }
+
         return `
             <header class="navbar-top">
                 <h2 style="font-size:18px; flex:1;">My Orders History</h2>
@@ -659,9 +676,13 @@ export class CustomerModule {
             </header>
 
             <main class="main-content">
-                ${this.app.state.orders.length === 0 ? `
-                    <div style="text-align:center; padding:40px; color:var(--text-muted);">No orders placed yet.</div>
-                ` : this.app.state.orders.map(o => {
+                ${userOrders.length === 0 ? `
+                    <div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
+                        <i class="fa-solid fa-box-open" style="font-size:48px; color:var(--text-muted); margin-bottom:12px;"></i>
+                        <h3 style="font-size:16px; margin-bottom:4px; color:var(--text-main);">No Orders Placed Yet</h3>
+                        <p style="font-size:12px;">Your order history will appear here once you place your first medicine order.</p>
+                    </div>
+                ` : userOrders.map(o => {
                     const isCompleted = o.order_status === 'Delivered';
                     const isCancelled = o.order_status === 'Cancelled';
                     const isActive = !isCompleted && !isCancelled;

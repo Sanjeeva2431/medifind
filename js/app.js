@@ -506,13 +506,22 @@ class MediFindApp {
     }
 
     completeCheckoutOrder(txId, paymentMethod, amount) {
+        const currentUser = this.authService.getUser();
+        const userId = currentUser ? currentUser.id : `usr_guest_${Date.now()}`;
+        const userName = currentUser ? currentUser.name : 'Guest Customer';
+        const userEmail = currentUser ? currentUser.email : 'guest@example.com';
+        const userPhone = currentUser ? (currentUser.phone || '+91 98765 43210') : '+91 98765 43210';
+        const userAddress = document.getElementById('deliveryAddressInput')?.value || (currentUser?.address ? (typeof currentUser.address === 'string' ? currentUser.address : `${currentUser.address.street || ''}, ${currentUser.address.city || ''}`) : 'Flat 402, Block B, Sector 18, Noida');
+
         const newOrderId = `ORD-${Math.floor(10000 + Math.random() * 90000)}`;
         const newOrder = {
             id: newOrderId,
-            user_id: 'usr_1',
-            customer_name: 'Alex Johnson',
-            customer_phone: '+91 98765 43210',
-            customer_address: document.getElementById('deliveryAddressInput')?.value || 'Flat 402, Block B, Sector 18, Noida',
+            user_id: userId,
+            customer_id: userId,
+            customer_name: userName,
+            customer_email: userEmail,
+            customer_phone: userPhone,
+            customer_address: userAddress,
             pharmacy_id: 'pharm_1',
             pharmacy_name: 'Apollo Pharmacy 24/7',
             pharmacy_phone: '+91 98765 12345',
