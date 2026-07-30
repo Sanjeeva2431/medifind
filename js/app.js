@@ -28,27 +28,11 @@ class MediFindApp {
             pharmacies: [...MOCK_PHARMACIES],
             orders: [...MOCK_ORDERS],
             cart: [],
-            prescriptions: [
-                {
-                    id: 'RX-901',
-                    user_name: 'Alex Johnson',
-                    status: 'Pending',
-                    items: [
-                        { name: 'Dolo 650mg Tablet', qty: 2, confidence: '98%' },
-                        { name: 'Becosules Z Capsule', qty: 1, confidence: '96%' }
-                    ]
-                }
-            ],
+            prescriptions: [],
             appliedCoupon: null,
-            favoritePharmacies: ['pharm_1'],
-            savedAddresses: [
-                { id: 'addr_1', label: 'Home', text: 'Flat 402, Block B, Sector 18, Noida, UP - 201301', isDefault: true },
-                { id: 'addr_2', label: 'Office', text: 'Plot 88, Tech Park Avenue, Greater Noida', isDefault: false }
-            ],
-            notifications: [
-                { id: 'n_1', title: 'Order Dispatched ⚡', body: 'Order ORD-89102 is out for delivery with Rohan Verma.', time: '10 mins ago', read: false },
-                { id: 'n_2', title: 'Prescription Verified ✅', body: 'Dr. Gupta verified your prescription RX-901.', time: '1 hour ago', read: true }
-            ]
+            favoritePharmacies: [],
+            savedAddresses: [],
+            notifications: []
         };
 
         this.customerModule = new CustomerModule(this);

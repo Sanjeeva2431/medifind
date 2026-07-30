@@ -204,72 +204,7 @@ const generateMedicines = () => {
 export const MOCK_MEDICINES = generateMedicines();
 
 // Sample Orders Database
-export const MOCK_ORDERS = [
-    {
-        id: 'ORD-98214',
-        user_id: 'usr_1',
-        customer_name: 'Alex Johnson',
-        customer_phone: '+91 98765 43210',
-        customer_address: 'Flat 402, Block B, Silver Oak Apartments, Sector 18, Noida',
-        pharmacy_id: 'pharm_1',
-        pharmacy_name: 'Apollo Pharmacy 24/7',
-        pharmacy_phone: '+91 98765 12345',
-        items: [
-            { id: 'med_1', name: 'Dolo 650mg Tablet', price: 30.50, quantity: 2, image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80' },
-            { id: 'med_16', name: 'Becosules Z Capsule', price: 48.00, quantity: 1, image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80' }
-        ],
-        subtotal: 109.00,
-        delivery_fee: 25.00,
-        tax: 5.45,
-        discount: 20.00,
-        total_amount: 119.45,
-        payment_method: 'UPI (Google Pay)',
-        payment_status: 'Paid',
-        order_status: 'Out for Delivery', // Placed, Accepted, Preparing, Partner Assigned, Out for Delivery, Delivered
-        tracking_step: 4,
-        created_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-        delivery_partner: {
-            id: 'partner_1',
-            name: 'Rohan Verma',
-            phone: '+91 98112 33445',
-            vehicle: 'Hero Splendor (KA-01-EQ-9982)',
-            rating: 4.9,
-            photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            otp: '4892'
-        }
-    },
-    {
-        id: 'ORD-98210',
-        user_id: 'usr_1',
-        customer_name: 'Alex Johnson',
-        customer_phone: '+91 98765 43210',
-        customer_address: 'Flat 402, Block B, Silver Oak Apartments, Sector 18, Noida',
-        pharmacy_id: 'pharm_2',
-        pharmacy_name: 'MedPlus Superstore',
-        items: [
-            { id: 'med_8', name: 'Augmentin 625 Duo Tablet', price: 201.50, quantity: 1, image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=300&auto=format&fit=crop&q=80' }
-        ],
-        subtotal: 201.50,
-        delivery_fee: 30.00,
-        tax: 10.00,
-        discount: 0,
-        total_amount: 241.50,
-        payment_method: 'Credit Card',
-        payment_status: 'Paid',
-        order_status: 'Delivered',
-        tracking_step: 5,
-        created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-        delivery_partner: {
-            id: 'partner_2',
-            name: 'Amit Kumar',
-            phone: '+91 97110 99887',
-            vehicle: 'Honda Activa (DL-3S-CX-4102)',
-            rating: 4.8,
-            photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-            otp: '1209'
-        }
-    }
-];
+export const MOCK_ORDERS = [];
 
 export const MOCK_COUPONS = [
     { code: 'HEALTH20', discount_percent: 20, max_discount: 100, min_order: 200, desc: '20% OFF on healthcare orders over ₹200' },
