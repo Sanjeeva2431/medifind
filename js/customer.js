@@ -30,6 +30,9 @@ export class CustomerModule {
 
     // 1. Home Feed
     renderHome() {
+        const userLoc = googleMapsService.getUserLocation();
+        googleMapsService.updateSyncPharmacyDistances(userLoc.lat, userLoc.lng);
+
         const cartCount = this.app.getCartCount();
         const activeOrder = this.app.state.orders.find(o => o.order_status !== 'Delivered');
 
@@ -166,6 +169,9 @@ export class CustomerModule {
 
     // 2. All Pharmacies Page (/pharmacies)
     renderPharmaciesPage() {
+        const userLoc = googleMapsService.getUserLocation();
+        googleMapsService.updateSyncPharmacyDistances(userLoc.lat, userLoc.lng);
+
         const query = (this.pharmacySearchQuery || '').toLowerCase();
         const filteredPharmacies = MOCK_PHARMACIES.filter(p => 
             !query || p.shop_name.toLowerCase().includes(query) || p.address.toLowerCase().includes(query)

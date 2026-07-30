@@ -5,6 +5,7 @@ export class GoogleMapsService {
         const savedLoc = localStorage.getItem('medifind_user_location');
         this.currentLocation = savedLoc ? JSON.parse(savedLoc) : { lat: 28.5355, lng: 77.3910, label: 'Sector 18, Noida', isLiveGps: false };
         this.customerDefaultLoc = this.currentLocation;
+        this.updateSyncPharmacyDistances(this.currentLocation.lat, this.currentLocation.lng);
         this.updatePharmacyDistances(this.currentLocation.lat, this.currentLocation.lng);
     }
 
@@ -50,6 +51,7 @@ export class GoogleMapsService {
                     };
                     this.customerDefaultLoc = this.currentLocation;
                     localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
+                    this.updateSyncPharmacyDistances(lat, lng);
                     this.updatePharmacyDistances(lat, lng);
                     resolve({ success: true, location: this.currentLocation, message: `📍 Located: ${addressLabel}! Nearby pharmacies updated.` });
                 },
@@ -74,34 +76,19 @@ export class GoogleMapsService {
         };
         this.customerDefaultLoc = this.currentLocation;
         localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
+        this.updateSyncPharmacyDistances(lat, lng);
         this.updatePharmacyDistances(lat, lng);
         return this.currentLocation;
     }
 
-    // 3. Recalculate Nearby Pharmacies & Addresses dynamically in Real Time based on User Location
-    async updatePharmacyDistances(userLat, userLng, pharmacies = []) {
+    // 3A. Instant Synchronous Pharmacy Localization around User Coordinates
+    updateSyncPharmacyDistances(userLat, userLng, pharmacies = []) {
         const targetList = pharmacies.length > 0 ? pharmacies : MOCK_PHARMACIES;
         const currentLocLabel = this.currentLocation ? (this.currentLocation.label || 'Your Area') : 'Your Area';
 
-        // Extract locality/area name
         let areaName = currentLocLabel.split(',')[0].replace(/Live GPS \([^)]+\)/gi, 'Your Area').trim() || 'Your Area';
+        if (areaName === 'Sector 18') areaName = 'Local Area';
 
-        // Try fetching real OSM pharmacy nodes around coordinates
-        let realOsmPharmacies = [];
-        try {
-            const overpassQuery = `[out:json];node(around:4000,${userLat},${userLng})["amenity"="pharmacy"];out 10;`;
-            const overpassRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
-            if (overpassRes.ok) {
-                const data = await overpassRes.json();
-                if (data && data.elements && data.elements.length > 0) {
-                    realOsmPharmacies = data.elements.filter(el => el.tags && el.tags.name);
-                }
-            }
-        } catch (osmErr) {
-            console.warn('[Maps API] OSM Overpass fallback:', osmErr);
-        }
-
-        // Realistic local radial offsets (0.005 deg ~ 500 meters)
         const localOffsets = [
             { dLat:  0.0035, dLng:  0.0042 }, // ~0.5 km
             { dLat: -0.0051, dLng:  0.0063 }, // ~0.9 km
@@ -133,17 +120,9 @@ export class GoogleMapsService {
             p.lat = userLat + offset.dLat;
             p.lng = userLng + offset.dLng;
 
-            // If real OSM pharmacy data is returned, use real OSM store name & street!
-            if (realOsmPharmacies[idx] && realOsmPharmacies[idx].tags) {
-                const osmTags = realOsmPharmacies[idx].tags;
-                p.shop_name = osmTags.name || `${defaultNames[idx % defaultNames.length]} - ${areaName}`;
-                p.address = osmTags['addr:street'] ? `${osmTags['addr:street']}, ${areaName}` : `Main Road, ${areaName}`;
-            } else {
-                // Dynamically anchor shop name and address to the detected location!
-                const baseName = defaultNames[idx % defaultNames.length];
-                p.shop_name = `${baseName} (${areaName})`;
-                p.address = `Plot ${12 + idx * 4}, Block ${String.fromCharCode(65 + (idx % 5))}, ${areaName}`;
-            }
+            const baseName = defaultNames[idx % defaultNames.length];
+            p.shop_name = `${baseName} (${areaName})`;
+            p.address = `Plot ${12 + idx * 4}, Block ${String.fromCharCode(65 + (idx % 5))}, ${areaName}`;
 
             const dist = this.calculateDistance(userLat, userLng, p.lat, p.lng);
             p.distance = `${dist} km`;
@@ -151,8 +130,39 @@ export class GoogleMapsService {
             p.delivery_time = times.deliveryTime;
         });
 
-        // Re-sort targetList by distance ascending so the closest pharmacies are always first
         targetList.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+    }
+
+    // 3B. Asynchronous Real-Time OpenStreetMap Pharmacy Fetch
+    async updatePharmacyDistances(userLat, userLng, pharmacies = []) {
+        this.updateSyncPharmacyDistances(userLat, userLng, pharmacies);
+
+        try {
+            const targetList = pharmacies.length > 0 ? pharmacies : MOCK_PHARMACIES;
+            const currentLocLabel = this.currentLocation ? (this.currentLocation.label || 'Your Area') : 'Your Area';
+            let areaName = currentLocLabel.split(',')[0].replace(/Live GPS \([^)]+\)/gi, 'Your Area').trim() || 'Your Area';
+
+            const overpassQuery = `[out:json];node(around:5000,${userLat},${userLng})["amenity"="pharmacy"];out 10;`;
+            const overpassRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
+            if (overpassRes.ok) {
+                const data = await overpassRes.json();
+                if (data && data.elements && data.elements.length > 0) {
+                    const realOsm = data.elements.filter(el => el.tags && el.tags.name);
+                    if (realOsm.length > 0) {
+                        targetList.forEach((p, idx) => {
+                            if (realOsm[idx] && realOsm[idx].tags) {
+                                const tags = realOsm[idx].tags;
+                                p.shop_name = tags.name || p.shop_name;
+                                p.address = tags['addr:street'] ? `${tags['addr:street']}, ${areaName}` : p.address;
+                            }
+                        });
+                        if (window.MediApp) window.MediApp.render();
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[Maps API] OSM fetch skipped:', e);
+        }
     }
 
     // 4. Haversine Formula for Accurate Distance Calculation (in Km)
