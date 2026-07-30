@@ -10,11 +10,11 @@ export const seedFirestore = (firestoreDb) => {
 
     // 1. Collection: Users
     const users = [
-        { id: 'usr_1', name: 'Alex Johnson', email: 'alex@example.com', phone: '+91 98765 43210', role: 'customer', address: { street: 'Flat 402, Block B, Sector 18', city: 'Noida', zip: '201301', lat: 28.5355, lng: 77.3910 } },
-        { id: 'usr_2', name: 'Priya Sharma', email: 'priya@example.com', phone: '+91 98111 22334', role: 'customer', address: { street: '42 Green Park', city: 'Delhi', zip: '110016', lat: 28.5500, lng: 77.2000 } },
-        { id: 'usr_pharm_1', name: 'Dr. S. K. Gupta', email: 'apollo@example.com', phone: '+91 98765 12345', role: 'pharmacy', address: { street: 'Apollo Pharmacy 24/7, Sector 18', city: 'Noida', zip: '201301', lat: 28.5355, lng: 77.3910 } },
-        { id: 'usr_driver_1', name: 'Rohan Verma', email: 'rohan@example.com', phone: '+91 98112 33445', role: 'delivery', address: { street: 'Delivery Hub 4', city: 'Noida', zip: '201301', lat: 28.5380, lng: 77.3880 } },
-        { id: 'usr_admin_1', name: 'Super Admin', email: 'admin@medifind.com', phone: '+91 99999 00000', role: 'admin', address: { street: 'MediFind HQ', city: 'Noida', zip: '201301', lat: 28.5355, lng: 77.3910 } }
+        { id: 'usr_1', name: 'Alex Johnson', email: 'alex@example.com', password: 'password123', phone: '+91 98765 43210', role: 'customer', address: { street: 'Flat 402, Block B, Sector 18', city: 'Noida', zip: '201301', lat: 28.5355, lng: 77.3910 } },
+        { id: 'usr_2', name: 'Priya Sharma', email: 'priya@example.com', password: 'password123', phone: '+91 98111 22334', role: 'customer', address: { street: '42 Green Park', city: 'Delhi', zip: '110016', lat: 28.5500, lng: 77.2000 } },
+        { id: 'usr_pharm_1', name: 'Dr. S. K. Gupta', email: 'apollo@example.com', password: 'password123', phone: '+91 98765 12345', role: 'pharmacy', address: { street: 'Apollo Pharmacy 24/7, Sector 18', city: 'Noida', zip: '201301', lat: 28.5355, lng: 77.3910 } },
+        { id: 'usr_driver_1', name: 'Rohan Verma', email: 'rohan@example.com', password: 'password123', phone: '+91 98112 33445', role: 'delivery', address: { street: 'Delivery Hub 4', city: 'Noida', zip: '201301', lat: 28.5380, lng: 77.3880 } },
+        { id: 'usr_admin_1', name: 'Super Admin', email: 'admin@medifind.com', password: 'adminpassword', phone: '+91 99999 00000', role: 'admin', address: { street: 'MediFind HQ', city: 'Noida', zip: '201301', lat: 28.5355, lng: 77.3910 } }
     ];
     users.forEach(u => firestoreDb.collections.Users.set(u.id, u));
     console.log(`✅ [1/8 Users] Populated ${users.length} documents.`);

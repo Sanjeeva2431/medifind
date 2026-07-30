@@ -81,14 +81,41 @@ export class AuthService {
     // 2. Email Login
     async login(email, password, rememberMe = true) {
         try {
+            const cleanEmail = (email || '').trim().toLowerCase();
+            const cleanPassword = (password || '').trim();
+
             const users = Array.from(firestoreDb.collections.Users.values());
-            const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+            let user = users.find(u => (u.email || '').toLowerCase() === cleanEmail);
+
+            // If user not in local memory, try fetching from Supabase DB sync
+            if (!user) {
+                try {
+                    const supabaseUrl = 'https://gixqpvojsyitkbgctlqz.supabase.co';
+                    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHFwdm9qc3lpdGtiZ2N0bHF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3ODE5MDYsImV4cCI6MjEwMDM1NzkwNn0.0cIqXypO-lW8cJWbpztFN6nVPljTrgaPRIqeQUo850I';
+                    const response = await fetch(`${supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}`, {
+                        method: 'GET',
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${supabaseKey}`
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.length > 0) {
+                            user = data[0];
+                            await firestoreDb.createUser(user);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Supabase Direct Fetch] Warning:', e);
+                }
+            }
 
             if (!user) {
                 return { success: false, message: 'No account found with this email.' };
             }
 
-            if (user.password && user.password !== password) {
+            if (user.password && user.password !== cleanPassword) {
                 return { success: false, message: 'Invalid password. Please check your credentials.' };
             }
 
