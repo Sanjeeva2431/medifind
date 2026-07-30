@@ -27,9 +27,7 @@ class MediFindApp {
             medicines: [...MOCK_MEDICINES],
             pharmacies: [...MOCK_PHARMACIES],
             orders: [...MOCK_ORDERS],
-            cart: [
-                { id: 'med_1', name: 'Dolo 650mg Tablet', price: 30.50, quantity: 2, image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80', pharmacy_name: 'Apollo Pharmacy 24/7' }
-            ],
+            cart: [],
             prescriptions: [
                 {
                     id: 'RX-901',
@@ -218,6 +216,7 @@ class MediFindApp {
             this.authService.setCurrentUser(res.user, rememberMe);
             const target = this.authService.getRedirectTabForRole(role);
             this.state.currentRole = target.role;
+            this.state.cart = []; // Reset cart on login
             this.showToast(`Welcome back, ${res.user.name}! Authenticated as ${role.toUpperCase()}`);
             this.render();
         } else {
