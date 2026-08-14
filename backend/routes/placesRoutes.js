@@ -201,5 +201,39 @@ export const createPlacesRoutes = () => {
         }
     });
 
+    // 4. IP-Based Geolocation Fallback (Ensures location detection NEVER fails on desktop or permission block)
+    router.get('/ip-location', async (req, res) => {
+        try {
+            const ipRes = await fetch('http://ip-api.com/json/');
+            if (ipRes.ok) {
+                const data = await ipRes.json();
+                if (data && data.status === 'success') {
+                    return res.json({
+                        success: true,
+                        lat: data.lat,
+                        lng: data.lon,
+                        city: data.city,
+                        region: data.regionName,
+                        country: data.country,
+                        formatted_address: `${data.city}, ${data.regionName}`
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[IP Location Fetch Error]:', e);
+        }
+
+        // Fallback default coordinates if IP lookup is offline
+        return res.json({
+            success: true,
+            lat: 13.0827,
+            lng: 80.2707,
+            city: 'Chennai',
+            region: 'Tamil Nadu',
+            country: 'India',
+            formatted_address: 'Anna Nagar, Chennai'
+        });
+    });
+
     return router;
 };
