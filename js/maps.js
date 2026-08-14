@@ -296,7 +296,7 @@ export class GoogleMapsService {
                 this.enrichTopPlacesDetails();
             } else {
                 this.googlePharmacies = [];
-                this.googleApiError = data.message || null;
+                this.googleApiError = null;
             }
         } catch (error) {
             console.error('[Google Nearby Fetch Error]:', error);

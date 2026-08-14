@@ -143,16 +143,7 @@ export class CustomerModule {
                         </div>
                     </div>
 
-                    ${googleApiError ? `
-                        <div style="background:var(--card-bg); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:16px; text-align:center; color:var(--text-main);">
-                            <i class="fa-solid fa-triangle-exclamation" style="color:var(--emergency-red); font-size:24px; margin-bottom:8px;"></i>
-                            <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Unable to load nearby pharmacies right now.</div>
-                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">${googleApiError}</div>
-                            <button class="add-cart-btn" style="margin:0 auto; padding:8px 16px;" onclick="MediApp.refreshNearbyPharmacies()">
-                                <i class="fa-solid fa-rotate-right"></i> Try Again
-                            </button>
-                        </div>
-                    ` : isSearchingGoogle ? `
+                    ${isSearchingGoogle ? `
                         <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px;">
                             ${[1, 2, 3].map(() => `
                                 <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); opacity:0.7;">
@@ -329,16 +320,7 @@ export class CustomerModule {
                     </div>
                 </div>
 
-                ${googleApiError ? `
-                    <div style="background:var(--card-bg); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:20px; text-align:center; margin-bottom:20px;">
-                        <i class="fa-solid fa-circle-exclamation" style="color:var(--emergency-red); font-size:32px; margin-bottom:10px;"></i>
-                        <h3 style="font-size:16px; margin-bottom:6px;">Unable to load nearby pharmacies right now.</h3>
-                        <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">${googleApiError}</p>
-                        <button class="add-cart-btn" style="margin:0 auto;" onclick="MediApp.refreshNearbyPharmacies()">
-                            <i class="fa-solid fa-rotate-right"></i> Try Again
-                        </button>
-                    </div>
-                ` : isSearchingGoogle ? `
+                ${isSearchingGoogle ? `
                     <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
                         <i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--primary); margin-bottom:12px;"></i>
                         <h3>🔎 Finding nearby pharmacies...</h3>
