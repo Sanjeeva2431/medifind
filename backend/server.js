@@ -28,6 +28,7 @@ import { createMedicineRoutes } from './routes/medicineRoutes.js';
 import { createPharmacyRoutes } from './routes/pharmacyRoutes.js';
 import { createOrderRoutes } from './routes/orderRoutes.js';
 import { createPrescriptionRoutes } from './routes/prescriptionRoutes.js';
+import { createPlacesRoutes } from './routes/placesRoutes.js';
 
 // Socket Handler
 import { initSocketHandler } from './socket/socketHandler.js';
@@ -77,6 +78,18 @@ app.use('/api/medicines', createMedicineRoutes(medCtrl));
 app.use('/api/pharmacies', createPharmacyRoutes(pharmCtrl));
 app.use('/api/orders', createOrderRoutes(orderCtrl));
 app.use('/api/prescriptions', createPrescriptionRoutes(prescriptionCtrl));
+app.use('/api/places', createPlacesRoutes());
+
+// Client Config API (exposes non-sensitive app settings like Google Maps API key availability)
+app.get('/api/config', (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
+    const hasValidKey = apiKey && !apiKey.includes('placeholder');
+    res.json({
+        success: true,
+        googleMapsApiKey: hasValidKey ? apiKey : null,
+        hasValidKey: !!hasValidKey
+    });
+});
 
 // Health Check API
 app.get('/api/health', (req, res) => {

@@ -3,169 +3,298 @@ import { MOCK_PHARMACIES } from './data.js';
 export class GoogleMapsService {
     constructor() {
         const savedLoc = localStorage.getItem('medifind_user_location');
-        this.currentLocation = savedLoc ? JSON.parse(savedLoc) : { lat: 28.5355, lng: 77.3910, label: 'Sector 18, Noida', isLiveGps: false };
-        this.customerDefaultLoc = this.currentLocation;
-        this.updateSyncPharmacyDistances(this.currentLocation.lat, this.currentLocation.lng);
-        this.updatePharmacyDistances(this.currentLocation.lat, this.currentLocation.lng);
+        this.currentLocation = savedLoc ? JSON.parse(savedLoc) : {
+            lat: 13.0827,
+            lng: 80.2707,
+            label: 'Anna Nagar, Chennai',
+            isLiveGps: false,
+            accuracy: null
+        };
+
+        this.locationState = {
+            status: 'idle', // 'idle' | 'detecting' | 'granted' | 'denied' | 'error'
+            errorMessage: '',
+            isLiveGps: this.currentLocation.isLiveGps
+        };
+
+        this.googlePharmacies = [];
+        this.isSearchingGoogle = false;
+        this.googleApiError = null;
+        this.watchId = null;
+
+        // Initialize Google Maps API key check
+        this.initGoogleMapsApi();
+    }
+
+    async initGoogleMapsApi() {
+        try {
+            const res = await fetch('/api/config');
+            if (res.ok) {
+                const config = await res.json();
+                if (config.success && config.googleMapsApiKey) {
+                    this.loadGoogleMapsScript(config.googleMapsApiKey);
+                }
+            }
+        } catch (e) {
+            console.warn('[Google Maps API Config Check Failed]:', e);
+        }
+    }
+
+    loadGoogleMapsScript(apiKey) {
+        if (window.google && window.google.maps) return;
+        if (document.getElementById('google-maps-js-sdk')) return;
+
+        const script = document.createElement('script');
+        script.id = 'google-maps-js-sdk';
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            console.log('⚡ Google Maps JavaScript API Loaded Successfully');
+            if (window.MediApp) window.MediApp.render();
+        };
+        document.head.appendChild(script);
     }
 
     getUserLocation() {
         return this.currentLocation;
     }
 
-    // 1. Request Browser Location Permission via HTML5 Geolocation API
+    getLocationState() {
+        return this.locationState;
+    }
+
+    // 1. Request Browser Real GPS Location Permission via HTML5 Geolocation API
     async requestBrowserLocation() {
+        this.locationState.status = 'detecting';
+        this.locationState.errorMessage = '';
+        if (window.MediApp) window.MediApp.render();
+
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
-                resolve({ success: false, message: 'Geolocation is not supported by your browser.' });
+                this.locationState.status = 'error';
+                this.locationState.errorMessage = 'Geolocation is not supported by your browser.';
+                if (window.MediApp) window.MediApp.render();
+                resolve({ success: false, message: this.locationState.errorMessage });
                 return;
             }
 
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
-                    const lat = parseFloat(position.coords.latitude.toFixed(4));
-                    const lng = parseFloat(position.coords.longitude.toFixed(4));
+                    const lat = parseFloat(position.coords.latitude.toFixed(6));
+                    const lng = parseFloat(position.coords.longitude.toFixed(6));
+                    const accuracy = Math.round(position.coords.accuracy || 0);
 
                     let addressLabel = `Live GPS (${lat}, ${lng})`;
 
-                    // Reverse geocoding lookup for human-readable city & area name
+                    // Reverse geocoding lookup for human-readable city & area name via backend proxy
                     try {
-                        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                        const geoRes = await fetch(`/api/places/geocode?lat=${lat}&lng=${lng}`);
                         if (geoRes.ok) {
                             const geoData = await geoRes.json();
-                            if (geoData && geoData.address) {
-                                const area = geoData.address.suburb || geoData.address.neighbourhood || geoData.address.residential || geoData.address.city_district || geoData.address.town || geoData.address.city || 'Your Area';
-                                const city = geoData.address.city || geoData.address.state_district || geoData.address.state || '';
-                                addressLabel = `${area}${city ? ', ' + city : ''}`;
+                            if (geoData && geoData.success && geoData.formatted_address) {
+                                addressLabel = geoData.formatted_address;
                             }
                         }
                     } catch (e) {
-                        console.warn('[Maps API] Geocoding fallback:', e);
+                        console.warn('[Maps API] Geocoding lookup error:', e);
                     }
 
                     this.currentLocation = {
                         lat,
                         lng,
                         label: addressLabel,
+                        isLiveGps: true,
+                        accuracy
+                    };
+
+                    this.locationState = {
+                        status: 'granted',
+                        errorMessage: '',
                         isLiveGps: true
                     };
-                    this.customerDefaultLoc = this.currentLocation;
+
                     localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
-                    this.updateSyncPharmacyDistances(lat, lng);
-                    this.updatePharmacyDistances(lat, lng);
-                    resolve({ success: true, location: this.currentLocation, message: `📍 Located: ${addressLabel}! Nearby pharmacies updated.` });
+
+                    // Fetch real nearby Google Places pharmacies
+                    await this.fetchNearbyPharmacies(lat, lng);
+
+                    if (window.MediApp) window.MediApp.render();
+
+                    resolve({
+                        success: true,
+                        location: this.currentLocation,
+                        message: `📍 Located: ${addressLabel}! Real nearby pharmacies retrieved.`
+                    });
                 },
                 (error) => {
                     let errMsg = 'Location permission denied.';
-                    if (error.code === error.POSITION_UNAVAILABLE) errMsg = 'Location information unavailable.';
-                    if (error.code === error.TIMEOUT) errMsg = 'Location request timed out.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        this.locationState.status = 'denied';
+                        errMsg = 'Location access is required to find pharmacies near you.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        this.locationState.status = 'error';
+                        errMsg = 'Unable to detect your current location.';
+                    } else if (error.code === error.TIMEOUT) {
+                        this.locationState.status = 'error';
+                        errMsg = 'Location detection timed out. Please try again.';
+                    } else {
+                        this.locationState.status = 'error';
+                        errMsg = 'Unable to detect your current location.';
+                    }
+
+                    this.locationState.errorMessage = errMsg;
+                    if (window.MediApp) window.MediApp.render();
                     resolve({ success: false, message: errMsg });
                 },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         });
     }
 
     // 2. Set Manual City / Address Location
-    setManualLocation(addressLabel, lat = 28.5355, lng = 77.3910) {
+    async setManualLocation(addressLabel, lat = 13.0827, lng = 80.2707) {
+        let finalLat = lat;
+        let finalLng = lng;
+        let finalLabel = addressLabel;
+
+        // Try forward geocoding if only address label is provided
+        if (addressLabel && (!lat || lat === 13.0827)) {
+            try {
+                const geoRes = await fetch(`/api/places/geocode?address=${encodeURIComponent(addressLabel)}`);
+                if (geoRes.ok) {
+                    const geoData = await geoRes.json();
+                    if (geoData && geoData.success && geoData.lat) {
+                        finalLat = geoData.lat;
+                        finalLng = geoData.lng;
+                        finalLabel = geoData.formatted_address || addressLabel;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Manual Geocode Error]:', e);
+            }
+        }
+
         this.currentLocation = {
-            lat,
-            lng,
-            label: addressLabel,
+            lat: finalLat,
+            lng: finalLng,
+            label: finalLabel,
+            isLiveGps: false,
+            accuracy: null
+        };
+
+        this.locationState = {
+            status: 'granted',
+            errorMessage: '',
             isLiveGps: false
         };
-        this.customerDefaultLoc = this.currentLocation;
+
         localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
-        this.updateSyncPharmacyDistances(lat, lng);
-        this.updatePharmacyDistances(lat, lng);
+
+        // Fetch Google Places for manually selected location
+        await this.fetchNearbyPharmacies(finalLat, finalLng);
+
+        if (window.MediApp) window.MediApp.render();
         return this.currentLocation;
     }
 
-    // 3A. Instant Synchronous Pharmacy Localization around User Coordinates
-    updateSyncPharmacyDistances(userLat, userLng, pharmacies = []) {
-        const targetList = pharmacies.length > 0 ? pharmacies : MOCK_PHARMACIES;
-        const currentLocLabel = this.currentLocation ? (this.currentLocation.label || 'Your Area') : 'Your Area';
-
-        let areaName = currentLocLabel.split(',')[0].replace(/Live GPS \([^)]+\)/gi, 'Your Area').trim() || 'Your Area';
-        if (areaName === 'Sector 18' || areaName === 'Local Area') areaName = 'Nearby Area';
-
-        const localOffsets = [
-            { dLat:  0.0035, dLng:  0.0042, dist: 0.4 }, // ~0.4 km
-            { dLat: -0.0051, dLng:  0.0063, dist: 0.8 }, // ~0.8 km
-            { dLat:  0.0078, dLng: -0.0071, dist: 1.2 }, // ~1.2 km
-            { dLat: -0.0102, dLng: -0.0089, dist: 1.6 }, // ~1.6 km
-            { dLat:  0.0135, dLng:  0.0124, dist: 2.1 }, // ~2.1 km
-            { dLat: -0.0168, dLng:  0.0155, dist: 2.7 }, // ~2.7 km
-            { dLat:  0.0210, dLng: -0.0182, dist: 3.4 }, // ~3.4 km
-            { dLat: -0.0255, dLng: -0.0221, dist: 4.1 }, // ~4.1 km
-            { dLat:  0.0310, dLng:  0.0285, dist: 4.9 }, // ~4.9 km
-            { dLat: -0.0380, dLng:  0.0340, dist: 5.8 }  // ~5.8 km
-        ];
-
-        const defaultNames = [
-            'Apollo Pharmacy 24/7',
-            'MedPlus Superstore',
-            'Wellness Forever Chemist',
-            'Sanjeevani Emergency Pharmacy',
-            'NetMeds Local Depot',
-            'Guardian Lifecare',
-            'Health & Glow Pharmacy',
-            'Trust Chemist & Druggist',
-            'Pulse 24/7 Express Pharma',
-            'Noble Plus Chemist'
-        ];
-
-        targetList.forEach((p, idx) => {
-            const offset = localOffsets[idx % localOffsets.length];
-            p.lat = userLat + offset.dLat;
-            p.lng = userLng + offset.dLng;
-
-            const baseName = defaultNames[idx % defaultNames.length];
-            p.shop_name = `${baseName} (${areaName})`;
-            p.address = `Plot ${12 + idx * 4}, Block ${String.fromCharCode(65 + (idx % 5))}, ${areaName}`;
-            p.distance = `${offset.dist} km`;
-
-            const times = this.calculateTravelTime(offset.dist);
-            p.delivery_time = times.deliveryTime;
-        });
-
-        targetList.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
-    }
-
-    // 3B. Asynchronous Real-Time OpenStreetMap Pharmacy Fetch
-    async updatePharmacyDistances(userLat, userLng, pharmacies = []) {
-        this.updateSyncPharmacyDistances(userLat, userLng, pharmacies);
+    // 3. Real Nearby Pharmacy Search via Google Places API Proxy
+    async fetchNearbyPharmacies(lat, lng) {
+        this.isSearchingGoogle = true;
+        this.googleApiError = null;
 
         try {
-            const targetList = pharmacies.length > 0 ? pharmacies : MOCK_PHARMACIES;
-            const currentLocLabel = this.currentLocation ? (this.currentLocation.label || 'Your Area') : 'Your Area';
-            let areaName = currentLocLabel.split(',')[0].replace(/Live GPS \([^)]+\)/gi, 'Your Area').trim() || 'Your Area';
+            const res = await fetch(`/api/places/nearby?lat=${lat}&lng=${lng}&radius=5000`);
+            const data = await res.json();
 
-            const overpassQuery = `[out:json];node(around:5000,${userLat},${userLng})["amenity"="pharmacy"];out 10;`;
-            const overpassRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
-            if (overpassRes.ok) {
-                const data = await overpassRes.json();
-                if (data && data.elements && data.elements.length > 0) {
-                    const realOsm = data.elements.filter(el => el.tags && el.tags.name);
-                    if (realOsm.length > 0) {
-                        targetList.forEach((p, idx) => {
-                            if (realOsm[idx] && realOsm[idx].tags) {
-                                const tags = realOsm[idx].tags;
-                                p.shop_name = tags.name || p.shop_name;
-                                p.address = tags['addr:street'] ? `${tags['addr:street']}, ${areaName}` : p.address;
+            if (res.ok && data.success && Array.isArray(data.pharmacies)) {
+                this.googlePharmacies = data.pharmacies.map(p => {
+                    const distKm = this.calculateDistance(lat, lng, p.lat, p.lng);
+                    const formattedDist = this.formatDistance(distKm);
+                    const times = this.calculateTravelTime(distKm);
+
+                    return {
+                        id: `gplace_${p.place_id}`,
+                        place_id: p.place_id,
+                        shop_name: p.name,
+                        address: p.address,
+                        lat: p.lat,
+                        lng: p.lng,
+                        rating: p.rating || 4.5,
+                        reviews_count: p.user_ratings_total || 12,
+                        status: p.open_now === false ? 'closed' : 'open',
+                        open_now: p.open_now,
+                        distance_km: distKm,
+                        distance: formattedDist,
+                        phone: p.phone || null,
+                        delivery_time: times.deliveryTime,
+                        delivery_available: true,
+                        isGooglePlace: true,
+                        logo: p.icon || 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=150&auto=format&fit=crop&q=80'
+                    };
+                });
+
+                // Sort closest to farthest
+                this.googlePharmacies.sort((a, b) => a.distance_km - b.distance_km);
+
+                // Fetch details for top 3 pharmacies to get phone number if available
+                this.enrichTopPlacesDetails();
+            } else {
+                this.googlePharmacies = [];
+                this.googleApiError = data.message || 'Unable to load nearby pharmacies right now.';
+            }
+        } catch (error) {
+            console.error('[Google Nearby Fetch Error]:', error);
+            this.googlePharmacies = [];
+            this.googleApiError = 'Unable to load nearby pharmacies right now.';
+        } finally {
+            this.isSearchingGoogle = false;
+        }
+    }
+
+    async enrichTopPlacesDetails() {
+        const top3 = this.googlePharmacies.slice(0, 3);
+        for (const p of top3) {
+            if (!p.phone && p.place_id) {
+                try {
+                    const res = await fetch(`/api/places/details?place_id=${p.place_id}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.success && data.details) {
+                            p.phone = data.details.formatted_phone_number || data.details.international_phone_number || null;
+                            if (data.details.opening_hours) {
+                                p.opening_hours_text = data.details.opening_hours.weekday_text;
                             }
-                        });
-                        if (window.MediApp) window.MediApp.render();
+                        }
                     }
+                } catch (e) {
+                    // Ignore background enrichment error
                 }
             }
-        } catch (e) {
-            console.warn('[Maps API] OSM fetch skipped:', e);
         }
+    }
+
+    // Get Active Pharmacy List: Google PlacesPharmacies if available, or empty if error
+    getPharmacies() {
+        if (this.googlePharmacies && this.googlePharmacies.length > 0) {
+            return this.googlePharmacies;
+        }
+        // Fallback: calculate distance for mock pharmacies relative to current user coordinates
+        return MOCK_PHARMACIES.map(p => {
+            const distKm = this.calculateDistance(this.currentLocation.lat, this.currentLocation.lng, p.lat || this.currentLocation.lat, p.lng || this.currentLocation.lng);
+            const times = this.calculateTravelTime(distKm);
+            return {
+                ...p,
+                distance_km: distKm,
+                distance: this.formatDistance(distKm),
+                delivery_time: times.deliveryTime
+            };
+        }).sort((a, b) => a.distance_km - b.distance_km);
     }
 
     // 4. Haversine Formula for Accurate Distance Calculation (in Km)
     calculateDistance(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return 1.0;
         const R = 6371; // Earth radius in km
         const dLat = (lat2 - lat1) * (Math.PI / 180);
         const dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -175,7 +304,16 @@ export class GoogleMapsService {
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distance = R * c;
-        return parseFloat(distance.toFixed(1));
+        return parseFloat(distance.toFixed(2));
+    }
+
+    // Format distance: "850 m" if < 1.0 km, "1.2 km" if >= 1.0 km
+    formatDistance(distKm) {
+        if (distKm < 1.0) {
+            const meters = Math.round(distKm * 1000);
+            return `${meters} m`;
+        }
+        return `${distKm.toFixed(1)} km`;
     }
 
     // 5. Estimated Travel & Delivery Time Calculator
@@ -188,54 +326,216 @@ export class GoogleMapsService {
         };
     }
 
-    // 3. AUTOMATICALLY CHOOSE NEAREST PHARMACY WITH STOCK
-    findNearestPharmacyWithStock(medId, customerLat = 28.5355, customerLng = 77.3910, medicines = [], pharmacies = []) {
-        const inStockMeds = medicines.filter(m => (m.id === medId || m.name.toLowerCase().includes(medId.toLowerCase())) && m.stock > 0);
-        if (inStockMeds.length === 0) return null;
-
-        const candidatePharmIds = inStockMeds.map(m => m.pharmacy_id);
-        let nearestPharm = null;
-        let minDistance = Infinity;
-
-        pharmacies.forEach(p => {
-            if (candidatePharmIds.includes(p.id) && p.status === 'open') {
-                const dist = parseFloat(p.distance) || 1.0;
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    const times = this.calculateTravelTime(dist);
-                    nearestPharm = {
-                        ...p,
-                        calculated_distance: `${dist} km`,
-                        calculated_drive_time: times.driveTime,
-                        calculated_delivery_time: times.deliveryTime
-                    };
-                }
-            }
-        });
-
-        return nearestPharm || pharmacies[0];
+    // 6. Generate Real Google Maps Directions URL
+    getDirectionsUrl(pharmacy) {
+        const origin = `${this.currentLocation.lat},${this.currentLocation.lng}`;
+        const destinationName = encodeURIComponent(`${pharmacy.shop_name} ${pharmacy.address}`);
+        let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destinationName}`;
+        if (pharmacy.place_id) {
+            url += `&destination_place_id=${pharmacy.place_id}`;
+        }
+        return url;
     }
 
-    // 4. Render Google Maps Interactive Canvas with Directions Polyline & Markers
-    renderMapCanvas(canvasId, options = {}) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width = canvas.parentElement?.clientWidth || 400;
-        const height = canvas.height = canvas.parentElement?.clientHeight || 200;
+    // 7. Enable Watch Position for Real-Time Movement Updates
+    startWatchPosition() {
+        if (this.watchId || !navigator.geolocation) return;
 
-        const {
-            pharmacies = [],
-            customerLoc = this.customerDefaultLoc,
-            driverLoc = null,
-            showDirections = true
-        } = options;
+        this.watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const newLat = parseFloat(position.coords.latitude.toFixed(6));
+                const newLng = parseFloat(position.coords.longitude.toFixed(6));
+
+                // Calculate distance moved from last known location
+                const distMoved = this.calculateDistance(this.currentLocation.lat, this.currentLocation.lng, newLat, newLng);
+
+                // Only refresh if user moved > 100 meters (0.1 km)
+                if (distMoved > 0.1) {
+                    console.log(`📍 Significant location change detected (${(distMoved * 1000).toFixed(0)}m moved). Updating pharmacies...`);
+                    this.currentLocation.lat = newLat;
+                    this.currentLocation.lng = newLng;
+                    this.currentLocation.accuracy = Math.round(position.coords.accuracy || 0);
+                    localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
+
+                    this.fetchNearbyPharmacies(newLat, newLng).then(() => {
+                        if (window.MediApp) window.MediApp.render();
+                    });
+                }
+            },
+            (err) => console.warn('[WatchPosition Error]:', err.message),
+            { enableHighAccuracy: true, maximumAge: 10000 }
+        );
+    }
+
+    stopWatchPosition() {
+        if (this.watchId && navigator.geolocation) {
+            navigator.geolocation.clearWatch(this.watchId);
+            this.watchId = null;
+        }
+    }
+
+    // 8. Render Google Map Canvas / SDK Map
+    renderMapCanvas(containerId, options = {}) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const pharmacies = options.pharmacies || this.getPharmacies();
+        const userLoc = this.currentLocation;
+
+        // If Google Maps JavaScript API is available, render real Interactive Google Map
+        if (window.google && window.google.maps) {
+            container.innerHTML = `<div id="${containerId}_gmap" style="width:100%; height:100%; min-height:220px; border-radius:var(--radius-md);"></div>`;
+            const mapElement = document.getElementById(`${containerId}_gmap`);
+            if (mapElement) {
+                const map = new google.maps.Map(mapElement, {
+                    center: { lat: userLoc.lat, lng: userLoc.lng },
+                    zoom: 14,
+                    disableDefaultUI: false,
+                    zoomControl: true,
+                    styles: [
+                        { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+                        { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+                        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+                        {
+                            featureType: "administrative.locality",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#d59563" }]
+                        },
+                        {
+                            featureType: "poi",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#d59563" }]
+                        },
+                        {
+                            featureType: "poi.park",
+                            elementType: "geometry",
+                            stylers: [{ color: "#263c3f" }]
+                        },
+                        {
+                            featureType: "poi.park",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#6b9a76" }]
+                        },
+                        {
+                            featureType: "road",
+                            elementType: "geometry",
+                            stylers: [{ color: "#38414e" }]
+                        },
+                        {
+                            featureType: "road",
+                            elementType: "geometry.stroke",
+                            stylers: [{ color: "#212a37" }]
+                        },
+                        {
+                            featureType: "road",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#9ca5b3" }]
+                        },
+                        {
+                            featureType: "road.highway",
+                            elementType: "geometry",
+                            stylers: [{ color: "#746855" }]
+                        },
+                        {
+                            featureType: "road.highway",
+                            elementType: "geometry.stroke",
+                            stylers: [{ color: "#1f2835" }]
+                        },
+                        {
+                            featureType: "road.highway",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#f3d19c" }]
+                        },
+                        {
+                            featureType: "water",
+                            elementType: "geometry",
+                            stylers: [{ color: "#17263c" }]
+                        },
+                        {
+                            featureType: "water",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#515c6d" }]
+                        },
+                        {
+                            featureType: "water",
+                            elementType: "labels.text.stroke",
+                            stylers: [{ color: "#17263c" }]
+                        }
+                    ]
+                });
+
+                // User Location Blue Pulsing Marker
+                new google.maps.Marker({
+                    position: { lat: userLoc.lat, lng: userLoc.lng },
+                    map,
+                    title: `🔵 Your Current Location (${userLoc.label})`,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: "#0284c7",
+                        fillOpacity: 1,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 3
+                    }
+                });
+
+                // Pharmacy Markers
+                const infoWindow = new google.maps.InfoWindow();
+
+                pharmacies.forEach(p => {
+                    if (p.lat && p.lng) {
+                        const marker = new google.maps.Marker({
+                            position: { lat: p.lat, lng: p.lng },
+                            map,
+                            title: p.shop_name,
+                            icon: {
+                                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+                                scale: 6,
+                                fillColor: "#ef4444",
+                                fillOpacity: 1,
+                                strokeColor: "#ffffff",
+                                strokeWeight: 2
+                            }
+                        });
+
+                        marker.addListener("click", () => {
+                            infoWindow.setContent(`
+                                <div style="color:#0f172a; padding:6px; font-family:sans-serif;">
+                                    <strong style="font-size:14px;">${p.shop_name}</strong>
+                                    <div style="font-size:12px; color:#475569; margin:4px 0;">${p.address}</div>
+                                    <div style="font-size:12px; margin-bottom:6px;">
+                                        ⭐ ${p.rating} (${p.reviews_count} reviews) • 📍 ${p.distance}
+                                    </div>
+                                    <a href="${this.getDirectionsUrl(p)}" target="_blank" style="display:inline-block; background:#0ea5e9; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">
+                                        🧭 Get Directions
+                                    </a>
+                                </div>
+                            `);
+                            infoWindow.open(map, marker);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        // Fallback Styled Canvas Render
+        let canvas = container.querySelector('canvas');
+        if (!canvas) {
+            container.innerHTML = `<canvas style="width:100%; height:100%; min-height:220px; border-radius:var(--radius-md);"></canvas>`;
+            canvas = container.querySelector('canvas');
+        }
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = container.clientWidth || 400;
+        const height = canvas.height = container.clientHeight || 220;
 
         // Dark Styled Map Background
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, width, height);
 
-        // Map Grid / Street Lines
+        // Grid Lines
         ctx.strokeStyle = '#1e293b';
         ctx.lineWidth = 1;
         for (let x = 0; x < width; x += 40) {
@@ -251,47 +551,25 @@ export class GoogleMapsService {
             ctx.stroke();
         }
 
-        // Customer Location Pin (Right)
-        const endPt = { x: width * 0.75, y: height * 0.45 };
-        // Nearby Pharmacy Cluster Pins (Immediately adjacent to customer pin)
-        const startPt = { x: width * 0.25, y: height * 0.55 };
+        const center = { x: width * 0.5, y: height * 0.5 };
 
-        // Draw Directions Route Polyline
-        if (showDirections) {
-            ctx.beginPath();
-            ctx.strokeStyle = '#0284c7';
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.moveTo(startPt.x, startPt.y);
-            ctx.lineTo(endPt.x, endPt.y);
-            ctx.stroke();
+        // Draw User Pin
+        this.drawMarker(ctx, center.x, center.y, '#0284c7', 'fa-location-crosshairs', `🔵 You (${userLoc.label.split(',')[0]})`);
 
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = '700 10px Plus Jakarta Sans, sans-serif';
-            ctx.fillText('⚡ 0.4 km Delivery Route (Live GPS)', (startPt.x + endPt.x) / 2, (startPt.y + endPt.y) / 2 - 10);
-        }
+        // Draw Nearby Pharmacy Pins in relative spread
+        pharmacies.slice(0, 6).forEach((p, idx) => {
+            const angle = (idx / 6) * 2 * Math.PI;
+            const distPx = 50 + (idx * 15);
+            const px = center.x + Math.cos(angle) * distPx;
+            const py = center.y + Math.sin(angle) * distPx;
 
-        // Draw Customer Location Marker
-        this.drawMarker(ctx, endPt.x, endPt.y, '#ef4444', 'fa-house-user', customerLoc.label || 'Your GPS Location');
-
-        // Draw Nearby Pharmacy Markers in tight local cluster
-        pharmacies.forEach((p, idx) => {
-            const px = startPt.x + (idx * 28);
-            const py = startPt.y + (idx % 2 === 0 ? 15 : -15);
-            this.drawMarker(ctx, px, py, '#0ea5e9', 'fa-store', `${p.shop_name} (${p.distance})`);
+            this.drawMarker(ctx, px, py, '#ef4444', 'fa-store', `📍 ${p.shop_name.split(' ')[0]} (${p.distance})`);
         });
-
-        // Draw Live Driver Marker if active
-        if (driverLoc) {
-            const dx = startPt.x + (endPt.x - startPt.x) * (driverLoc.progress || 0.5);
-            const dy = startPt.y + (endPt.y - startPt.y) * (driverLoc.progress || 0.5);
-            this.drawMarker(ctx, dx, dy, '#22c55e', 'fa-motorcycle', 'Rohan (Driver)');
-        }
     }
 
     drawMarker(ctx, x, y, color, iconClass, label) {
         ctx.save();
-        // Pulse ring
+        // Ring
         ctx.beginPath();
         ctx.arc(x, y, 14, 0, 2 * Math.PI);
         ctx.fillStyle = color + '33';
@@ -306,7 +584,7 @@ export class GoogleMapsService {
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
 
-        // Text label
+        // Label
         ctx.fillStyle = '#f8fafc';
         ctx.font = 'bold 10px Plus Jakarta Sans, sans-serif';
         ctx.textAlign = 'center';

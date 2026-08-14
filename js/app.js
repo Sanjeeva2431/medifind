@@ -11,6 +11,7 @@ import { AuthService } from './auth.js';
 import { RealtimeEngine } from './realtime-engine.js';
 import { PaymentService } from './payment.js';
 import { FcmService } from './fcm.js';
+import { googleMapsService } from './maps.js';
 
 class MediFindApp {
     constructor() {
@@ -59,17 +60,18 @@ class MediFindApp {
             this.state.authMode = 'landing';
         }
 
-        // Auto-detect browser GPS location and recalculate distances
+        // Auto-detect real browser GPS location on startup
         if (navigator.geolocation) {
-            import('./maps.js').then(({ googleMapsService }) => {
-                googleMapsService.requestBrowserLocation().then(res => {
-                    if (res.success) {
-                        this.showToast('📍 Exact GPS Location Detected & Medications Sorted by Distance!');
-                        this.render();
-                    }
-                });
+            googleMapsService.requestBrowserLocation().then(res => {
+                if (res.success) {
+                    this.showToast('📍 Real GPS Location Detected! Nearby Pharmacies Loaded');
+                }
+                this.render();
             });
         }
+
+        // Enable position watcher for real-time updates when moving
+        googleMapsService.startWatchPosition();
 
         this.render();
         this.showToast('MediFind Application Ready 🏥');
@@ -95,12 +97,83 @@ class MediFindApp {
 
         setTimeout(() => {
             if (this.state.customerTab === 'pharmacies') {
-                googleMapsService.renderMapCanvas('nearbyPharmaciesMapCanvas', {
-                    lat: 28.5355,
-                    lng: 77.3910
-                });
+                googleMapsService.renderMapCanvas('nearbyPharmaciesMapCanvas');
             }
         }, 100);
+    }
+
+    // Location & Pharmacy Actions
+    async detectLiveLocation() {
+        this.showToast('📍 Detecting your location via GPS...');
+        const res = await googleMapsService.requestBrowserLocation();
+        if (res.success) {
+            this.showToast(`📍 Location Detected: ${res.location.label}`);
+        } else {
+            this.showToast(`⚠️ ${res.message}`);
+        }
+        this.render();
+    }
+
+    async refreshNearbyPharmacies() {
+        const loc = googleMapsService.getUserLocation();
+        this.showToast('🔎 Refreshing nearby pharmacies via Google Places...');
+        await googleMapsService.fetchNearbyPharmacies(loc.lat, loc.lng);
+        this.showToast('✅ Nearby pharmacies updated');
+        this.render();
+    }
+
+    openAddressModal() {
+        const currentLoc = googleMapsService.getUserLocation();
+        this.showModal(`
+            <div class="modal-card">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h3 style="font-size:18px; margin-bottom:12px;"><i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i> Select Your Location</h3>
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
+                    Find pharmacies and check medicine availability near your exact position.
+                </p>
+                
+                <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px; margin-bottom:16px;" onclick="MediApp.closeModal(); MediApp.detectLiveLocation();">
+                    <i class="fa-solid fa-location-arrow"></i> Detect My Current GPS Location
+                </button>
+                
+                <div style="border-top:1px dashed var(--card-border); margin:16px 0; padding-top:14px;">
+                    <label style="font-size:11px; font-weight:800; color:var(--text-muted); display:block; margin-bottom:6px;">ENTER LOCATION MANUALLY</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="manualLocationInput" placeholder="Enter area, city or street address..." value="${currentLoc.label}" style="flex:1; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-md); font-size:13px;">
+                        <button class="add-cart-btn" style="padding:10px 14px;" onclick="MediApp.submitManualLocation()">Set</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px;">
+                    <label style="font-size:11px; font-weight:800; color:var(--text-muted); display:block; margin-bottom:6px;">POPULAR CITIES & PRESETS</label>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.setPresetLocation('Anna Nagar, Chennai', 13.0827, 80.2707)">Chennai</button>
+                        <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.setPresetLocation('Sector 18, Noida', 28.5355, 77.3910)">Noida</button>
+                        <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.setPresetLocation('Connaught Place, New Delhi', 28.6315, 77.2167)">Delhi</button>
+                        <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.setPresetLocation('Bandra West, Mumbai', 19.0596, 72.8295)">Mumbai</button>
+                        <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.setPresetLocation('Koramangala, Bengaluru', 12.9352, 77.6245)">Bengaluru</button>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+
+    async submitManualLocation() {
+        const input = document.getElementById('manualLocationInput')?.value?.trim();
+        if (!input) return;
+        this.closeModal();
+        this.showToast('📍 Updating location...');
+        await googleMapsService.setManualLocation(input);
+        this.showToast(`📍 Location updated to: ${input}`);
+        this.render();
+    }
+
+    async setPresetLocation(label, lat, lng) {
+        this.closeModal();
+        this.showToast(`📍 Setting location to ${label}...`);
+        await googleMapsService.setManualLocation(label, lat, lng);
+        this.showToast(`📍 Location set to: ${label}`);
+        this.render();
     }
 
     // Customer Actions
@@ -110,23 +183,9 @@ class MediFindApp {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    viewPharmacyDetails(id) {
-        this.customerModule.selectedPharmacyId = id;
-        this.setCustomerTab('pharmacy-detail');
-    }
-
-    viewMedicineDetails(id) {
-        this.customerModule.selectedMedicineId = id;
-        this.setCustomerTab('medicine-detail');
-    }
-
-    buyNow(id) {
-        this.addToCart(id);
-        this.setCustomerTab('cart');
-    }
-
     filterPharmacies(val) {
-        // Dynamic search filter handled in pharmacies page
+        this.customerModule.pharmacySearchQuery = val;
+        this.render();
     }
 
     openAccountModal() {

@@ -10,6 +10,7 @@ export class CustomerModule {
         this.searchQuery = '';
         this.selectedPharmacyId = null;
         this.selectedMedicineId = null;
+        this.pharmacySearchQuery = '';
         this.searchEngine = new IntelligentSearchEngine(MOCK_MEDICINES, MOCK_PHARMACIES);
     }
 
@@ -31,7 +32,10 @@ export class CustomerModule {
     // 1. Home Feed
     renderHome() {
         const userLoc = googleMapsService.getUserLocation();
-        googleMapsService.updateSyncPharmacyDistances(userLoc.lat, userLoc.lng);
+        const locState = googleMapsService.getLocationState();
+        const pharmacies = googleMapsService.getPharmacies();
+        const isSearchingGoogle = googleMapsService.isSearchingGoogle;
+        const googleApiError = googleMapsService.googleApiError;
 
         const cartCount = this.app.getCartCount();
         const activeOrder = this.app.state.orders.find(o => o.order_status !== 'Delivered');
@@ -46,8 +50,8 @@ export class CustomerModule {
 
                 <div class="location-selector" onclick="MediApp.openAddressModal()">
                     <i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i>
-                    <span>${googleMapsService.getUserLocation().label}</span>
-                    <i class="fa-solid fa-chevron-down" style="font-size:10px;"></i>
+                    <span>${locState.status === 'detecting' ? '📍 Finding your location...' : userLoc.label}</span>
+                    <button class="btn-secondary" style="padding:2px 8px; font-size:10px; margin-left:4px;" onclick="event.stopPropagation(); MediApp.openAddressModal()">Change</button>
                 </div>
 
                 <div class="top-actions">
@@ -65,8 +69,11 @@ export class CustomerModule {
             </header>
 
             <main class="main-content">
+                <!-- Location Status & Permission Banner -->
+                ${this.renderLocationStateBanner(locState, userLoc)}
+
                 <!-- Search Hero Banner -->
-                <section class="search-hero">
+                <section class="search-hero" style="margin-top:12px;">
                     <h2 class="search-title">Fast 15-Minute Medicine Delivery ⚡</h2>
                     <p class="search-subtitle">Order genuine medicines from verified nearby pharmacies at lowest prices</p>
                     
@@ -124,42 +131,70 @@ export class CustomerModule {
                     </div>
                 </section>
 
-                <!-- Real-Time GPS Location Filter Banner -->
-                <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; box-shadow:var(--shadow-md); border:1px solid rgba(255,255,255,0.1);">
-                    <div>
-                        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800; color:var(--primary);">REAL-TIME GOOGLE MAPS GPS FILTER</div>
-                        <div style="font-size:15px; font-weight:800; margin-top:2px;">📍 ${userLoc.label}</div>
-                        <div style="font-size:11px; opacity:0.8; margin-top:2px;">Showing open pharmacies & medications strictly within 5 km delivery radius</div>
-                    </div>
-                    <button class="add-cart-btn" style="background:var(--primary); color:white; padding:8px 14px; font-size:12px;" onclick="MediApp.detectLiveLocation()">
-                        <i class="fa-solid fa-location-crosshairs"></i> Use Live GPS
-                    </button>
-                </div>
-
-                <!-- Nearby Pharmacies Horizontal Carousel -->
+                <!-- Nearby Pharmacies Horizontal Carousel (Google Places API) -->
                 <section style="margin-bottom: 24px;">
                     <div class="section-header">
-                        <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Open Pharmacies (&lt; 5.0 km)</h3>
-                        <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${[...MOCK_PHARMACIES].filter(p => (parseFloat(p.distance) || 0) <= 5.0).length})</span>
+                        <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Pharmacies</h3>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
+                                <i class="fa-solid fa-arrows-rotate"></i> Refresh Nearby Pharmacies
+                            </button>
+                            <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${pharmacies.length})</span>
+                        </div>
                     </div>
-                    <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
-                        ${[...MOCK_PHARMACIES].filter(p => (parseFloat(p.distance) || 0) <= 5.0).sort((a, b) => (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99)).slice(0, 6).map(p => `
-                            <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); cursor:pointer;"
-                                 onclick="MediApp.viewPharmacyDetails('${p.id}')">
-                                <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
-                                    <img src="${p.logo}" style="width:48px; height:48px; border-radius:var(--radius-sm); object-fit:cover;">
+
+                    ${googleApiError ? `
+                        <div style="background:var(--card-bg); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:16px; text-align:center; color:var(--text-main);">
+                            <i class="fa-solid fa-triangle-exclamation" style="color:var(--emergency-red); font-size:24px; margin-bottom:8px;"></i>
+                            <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Unable to load nearby pharmacies right now.</div>
+                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">${googleApiError}</div>
+                            <button class="add-cart-btn" style="margin:0 auto; padding:8px 16px;" onclick="MediApp.refreshNearbyPharmacies()">
+                                <i class="fa-solid fa-rotate-right"></i> Try Again
+                            </button>
+                        </div>
+                    ` : isSearchingGoogle ? `
+                        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px;">
+                            ${[1, 2, 3].map(() => `
+                                <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); opacity:0.7;">
+                                    <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">🔎 Finding nearby pharmacies...</div>
+                                    <div style="height:14px; background:var(--card-border); border-radius:4px; margin-bottom:6px; width:80%;"></div>
+                                    <div style="height:10px; background:var(--card-border); border-radius:4px; width:60%;"></div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
+                            ${pharmacies.slice(0, 8).map(p => `
+                                <div style="flex:0 0 270px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); cursor:pointer; display:flex; flex-direction:column; justify-content:space-between;"
+                                     onclick="MediApp.viewPharmacyDetails('${p.id}')">
                                     <div>
-                                        <div style="font-weight:700; font-size:14px;">${p.shop_name}</div>
-                                        <div style="font-size:11px; color:var(--text-muted);">${p.distance} • ⚡ ${p.delivery_time}</div>
+                                        <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
+                                            <img src="${p.logo}" style="width:48px; height:48px; border-radius:var(--radius-sm); object-fit:cover;">
+                                            <div style="flex:1;">
+                                                <div style="font-weight:700; font-size:14px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.shop_name}</div>
+                                                <div style="font-size:11px; color:var(--text-muted);">${p.address ? p.address.split(',').slice(0, 2).join(',') : ''}</div>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:8px;">
+                                            <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;">
+                                                ⭐ ${p.rating} ${p.reviews_count ? `(${p.reviews_count})` : ''}
+                                            </span>
+                                            <span style="font-weight:800; color:${p.status === 'open' ? 'var(--secondary)' : 'var(--emergency-red)'};">
+                                                ${p.status === 'open' ? '🟢 Open' : '🔴 Closed'}
+                                            </span>
+                                        </div>
+                                        <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">
+                                            📍 ${p.distance} away • ⚡ ${p.delivery_time}
+                                        </div>
                                     </div>
+
+                                    <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="text-decoration:none; text-align:center; justify-content:center; padding:6px 10px; font-size:11px;" onclick="event.stopPropagation();">
+                                        <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+                                    </a>
                                 </div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-                                    <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating}</span>
-                                    <span style="color:var(--secondary); font-weight:700;">● OPEN NOW</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
+                            `).join('')}
+                        </div>
+                    `}
                 </section>
 
                 <!-- Popular Medicines Grid -->
@@ -179,36 +214,112 @@ export class CustomerModule {
         `;
     }
 
+    // Render Location State & Permission Banner
+    renderLocationStateBanner(locState, userLoc) {
+        if (locState.status === 'detecting') {
+            return `
+                <div style="background:var(--primary-light); color:var(--primary); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="font-size:18px;"></i>
+                        <span style="font-weight:700; font-size:13px;">📍 Finding your location...</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (locState.status === 'denied') {
+            return `
+                <div style="background:var(--card-bg); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:16px; margin-bottom:16px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                        <i class="fa-solid fa-location-crosshairs" style="font-size:24px; color:var(--emergency-red);"></i>
+                        <div>
+                            <strong style="font-size:14px; color:var(--text-main);">Location access is required to find pharmacies near you.</strong>
+                            <div style="font-size:12px; color:var(--text-muted);">Please grant permission or enter your location manually to discover nearby medical stores.</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="add-cart-btn" style="padding:8px 14px; font-size:12px;" onclick="MediApp.detectLiveLocation()">
+                            <i class="fa-solid fa-location-arrow"></i> Allow Location
+                        </button>
+                        <button class="btn-secondary" style="padding:8px 14px; font-size:12px;" onclick="MediApp.openAddressModal()">
+                            <i class="fa-solid fa-pen-to-square"></i> Enter Location Manually
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (locState.status === 'error') {
+            return `
+                <div style="background:var(--card-bg); border:1px solid var(--warning-amber); border-radius:var(--radius-md); padding:16px; margin-bottom:16px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size:24px; color:var(--warning-amber);"></i>
+                        <div>
+                            <strong style="font-size:14px; color:var(--text-main);">Unable to detect your current location.</strong>
+                            <div style="font-size:12px; color:var(--text-muted);">${locState.errorMessage || 'Please check your GPS or browser location permissions.'}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="add-cart-btn" style="padding:8px 14px; font-size:12px;" onclick="MediApp.detectLiveLocation()">
+                            <i class="fa-solid fa-rotate-right"></i> Try Again
+                        </button>
+                        <button class="btn-secondary" style="padding:8px 14px; font-size:12px;" onclick="MediApp.openAddressModal()">
+                            <i class="fa-solid fa-pen-to-square"></i> Enter Location Manually
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Granted / Active GPS Location Filter Banner
+        return `
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; box-shadow:var(--shadow-md); border:1px solid rgba(255,255,255,0.1);">
+                <div>
+                    <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800; color:var(--primary);">REAL-TIME GPS LOCATION</div>
+                    <div style="font-size:15px; font-weight:800; margin-top:2px;">📍 ${userLoc.label} ${userLoc.accuracy ? `<span style="font-size:11px; opacity:0.7; font-weight:normal;">(±${userLoc.accuracy}m)</span>` : ''}</div>
+                    <div style="font-size:11px; opacity:0.8; margin-top:2px;">Showing real pharmacies & stock sorted strictly by distance</div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="add-cart-btn" style="background:var(--primary); color:white; padding:8px 12px; font-size:12px;" onclick="MediApp.detectLiveLocation()">
+                        <i class="fa-solid fa-location-crosshairs"></i> Refresh GPS
+                    </button>
+                    <button class="btn-secondary" style="background:rgba(255,255,255,0.1); color:white; padding:8px 12px; font-size:12px; border:none;" onclick="MediApp.openAddressModal()">
+                        Change
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     // 2. All Pharmacies Page (/pharmacies)
     renderPharmaciesPage() {
         const userLoc = googleMapsService.getUserLocation();
-        googleMapsService.updateSyncPharmacyDistances(userLoc.lat, userLoc.lng);
+        const pharmacies = googleMapsService.getPharmacies();
+        const isSearchingGoogle = googleMapsService.isSearchingGoogle;
+        const googleApiError = googleMapsService.googleApiError;
 
         const query = (this.pharmacySearchQuery || '').toLowerCase();
-        // Filter pharmacies strictly within 5.0 km radius of detected user location
-        const nearbyOnly = MOCK_PHARMACIES.filter(p => (parseFloat(p.distance) || 0) <= 5.0);
-        const filteredPharmacies = (nearbyOnly.length > 0 ? nearbyOnly : MOCK_PHARMACIES).filter(p => 
+        const filteredPharmacies = pharmacies.filter(p => 
             !query || p.shop_name.toLowerCase().includes(query) || p.address.toLowerCase().includes(query)
-        ).sort((a, b) => (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99));
+        );
 
         return `
             <header class="navbar-top">
                 <button class="icon-btn" onclick="MediApp.setCustomerTab('home')"><i class="fa-solid fa-arrow-left"></i></button>
                 <h2 style="font-size:18px; flex:1;">Pharmacies Near You (${filteredPharmacies.length})</h2>
+                <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
+                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                </button>
             </header>
 
             <main class="main-content">
-                <!-- Interactive Real-Time Google Maps Embed -->
+                <!-- Interactive Real-Time Google Maps Container -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:12px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Google Maps Embed • ${userLoc.label}</span>
+                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Interactive Google Map • ${userLoc.label}</span>
                         <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Refresh GPS</button>
                     </div>
-                    <div style="height:200px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);">
-                        <iframe width="100%" height="200" frameborder="0" style="border:0;" 
-                                src="https://maps.google.com/maps?q=${userLoc.lat},${userLoc.lng}&z=14&output=embed" allowfullscreen>
-                        </iframe>
-                    </div>
+                    <div id="nearbyPharmaciesMapCanvas" style="height:220px; width:100%; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);"></div>
                 </div>
 
                 <div style="margin-bottom:16px;">
@@ -218,34 +329,51 @@ export class CustomerModule {
                     </div>
                 </div>
 
-                <div style="display:flex; flex-direction:column; gap:14px;">
-                    ${filteredPharmacies.map(p => {
-                        const isFav = (this.app.state.favoritePharmacies || []).includes(p.id);
-                        return `
-                            <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; gap:14px; align-items:center; box-shadow:var(--shadow-sm); cursor:pointer;"
-                                 onclick="MediApp.viewPharmacyDetails('${p.id}')">
-                                <img src="${p.logo}" style="width:64px; height:64px; border-radius:var(--radius-md); object-fit:cover;">
-                                <div style="flex:1;">
-                                    <div style="font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:space-between;">
-                                        <span>${p.shop_name} <i class="fa-solid fa-circle-check" style="color:var(--primary); font-size:14px;" title="Verified License"></i></span>
-                                        <button class="icon-btn" style="padding:4px; color:${isFav ? 'var(--emergency-red)' : 'var(--text-muted)'};" onclick="event.stopPropagation(); MediApp.toggleFavoritePharmacy('${p.id}')">
-                                            <i class="fa-${isFav ? 'solid' : 'regular'} fa-heart"></i>
-                                        </button>
+                ${googleApiError ? `
+                    <div style="background:var(--card-bg); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:20px; text-align:center; margin-bottom:20px;">
+                        <i class="fa-solid fa-circle-exclamation" style="color:var(--emergency-red); font-size:32px; margin-bottom:10px;"></i>
+                        <h3 style="font-size:16px; margin-bottom:6px;">Unable to load nearby pharmacies right now.</h3>
+                        <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">${googleApiError}</p>
+                        <button class="add-cart-btn" style="margin:0 auto;" onclick="MediApp.refreshNearbyPharmacies()">
+                            <i class="fa-solid fa-rotate-right"></i> Try Again
+                        </button>
+                    </div>
+                ` : isSearchingGoogle ? `
+                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--primary); margin-bottom:12px;"></i>
+                        <h3>🔎 Finding nearby pharmacies...</h3>
+                    </div>
+                ` : `
+                    <div style="display:flex; flex-direction:column; gap:14px;">
+                        ${filteredPharmacies.map(p => {
+                            const isFav = (this.app.state.favoritePharmacies || []).includes(p.id);
+                            return `
+                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; gap:14px; align-items:center; box-shadow:var(--shadow-sm); cursor:pointer;"
+                                     onclick="MediApp.viewPharmacyDetails('${p.id}')">
+                                    <img src="${p.logo}" style="width:64px; height:64px; border-radius:var(--radius-md); object-fit:cover;">
+                                    <div style="flex:1;">
+                                        <div style="font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:space-between;">
+                                            <span>${p.shop_name} <i class="fa-solid fa-circle-check" style="color:var(--primary); font-size:14px;" title="Verified License"></i></span>
+                                            <button class="icon-btn" style="padding:4px; color:${isFav ? 'var(--emergency-red)' : 'var(--text-muted)'};" onclick="event.stopPropagation(); MediApp.toggleFavoritePharmacy('${p.id}')">
+                                                <i class="fa-${isFav ? 'solid' : 'regular'} fa-heart"></i>
+                                            </button>
+                                        </div>
+                                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
+                                        <div style="display:flex; gap:10px; font-size:12px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+                                            <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating} ${p.reviews_count ? `(${p.reviews_count})` : ''}</span>
+                                            <span style="font-weight:700; color:var(--primary);">📍 ${p.distance} away</span>
+                                            <span style="font-weight:800; color:${p.status === 'open' ? 'var(--secondary)' : 'var(--emergency-red)'};">${p.status === 'open' ? '🟢 Open' : '🔴 Closed'}</span>
+                                        </div>
+                                        ${p.phone ? `<div style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-phone"></i> ${p.phone}</div>` : ''}
                                     </div>
-                                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
-                                    <div style="display:flex; gap:10px; font-size:12px; align-items:center;">
-                                        <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating} (${p.reviews_count})</span>
-                                        <span>📍 ${p.distance}</span>
-                                        <span>⚡ ${p.delivery_time}</span>
-                                    </div>
+                                    <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="text-decoration:none; padding:8px 12px; font-size:12px;" onclick="event.stopPropagation();">
+                                        <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+                                    </a>
                                 </div>
-                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.shop_name + ' ' + p.address)}" target="_blank" class="add-cart-btn" style="text-decoration:none; padding:8px 12px; font-size:12px;" onclick="event.stopPropagation();">
-                                    <i class="fa-solid fa-location-arrow"></i> Nav
-                                </a>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `}
             </main>
             ${this.renderBottomNav()}
         `;
@@ -253,8 +381,12 @@ export class CustomerModule {
 
     // 3. Pharmacy Details Page (/pharmacy/:id)
     renderPharmacyDetailPage() {
-        const p = MOCK_PHARMACIES.find(item => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES[0];
+        const pharmacies = googleMapsService.getPharmacies();
+        const p = pharmacies.find(item => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES.find(item => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES[0];
+        
+        // Match inventory from MediFind database
         const pMedicines = MOCK_MEDICINES.filter(m => m.pharmacy_id === p.id);
+        const hasMediFindInventory = pMedicines.length > 0;
 
         return `
             <header class="navbar-top">
@@ -269,24 +401,36 @@ export class CustomerModule {
                         <div>
                             <h2 style="font-size:20px;">${p.shop_name}</h2>
                             <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
-                            <div style="font-size:12px; color:var(--primary); font-weight:700;">Drug License: <code>${p.license_number}</code></div>
+                            <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px;">📍 ${p.distance} away • ⭐ ${p.rating} rating</div>
+                            ${p.license_number ? `<div style="font-size:11px; color:var(--text-muted);">Drug License: <code>${p.license_number}</code></div>` : ''}
                         </div>
                     </div>
 
                     <div style="display:flex; gap:10px;">
-                        <button class="btn-secondary" style="flex:1; justify-content:center;" onclick="alert('Calling ${p.shop_name} at ${p.phone}')">
-                            <i class="fa-solid fa-phone"></i> Call Pharmacy
-                        </button>
-                        <button class="add-cart-btn" style="flex:1; justify-content:center;" onclick="MediApp.openAiDrawer()">
-                            <i class="fa-solid fa-comments"></i> Chat Pharmacy
-                        </button>
+                        ${p.phone ? `
+                            <a href="tel:${p.phone}" class="btn-secondary" style="flex:1; justify-content:center; text-decoration:none; align-items:center;">
+                                <i class="fa-solid fa-phone"></i> Call Pharmacy
+                            </a>
+                        ` : ''}
+                        <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="flex:1; justify-content:center; text-decoration:none; align-items:center;">
+                            <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+                        </a>
                     </div>
                 </div>
 
-                <h3 style="font-size:16px; margin-bottom:14px;">Available Medicines in this Pharmacy (${pMedicines.length})</h3>
-                <div class="cards-grid">
-                    ${this.renderMedicineCards(pMedicines)}
-                </div>
+                <h3 style="font-size:16px; margin-bottom:14px;">MediFind Medicine Inventory Status</h3>
+                
+                ${hasMediFindInventory ? `
+                    <div class="cards-grid">
+                        ${this.renderMedicineCards(pMedicines)}
+                    </div>
+                ` : `
+                    <div style="background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-md); padding:24px; text-align:center; color:var(--text-muted);">
+                        <i class="fa-solid fa-clipboard-question" style="font-size:36px; color:var(--text-muted); margin-bottom:8px;"></i>
+                        <h4 style="font-size:15px; color:var(--text-main); margin-bottom:4px;">Medicine availability not available</h4>
+                        <p style="font-size:12px;">This pharmacy is discovered via Google Places, but does not currently have registered real-time stock data in MediFind's database.</p>
+                    </div>
+                `}
             </main>
             ${this.renderBottomNav()}
         `;
@@ -316,7 +460,7 @@ export class CustomerModule {
                     <div style="display:flex; justify-content:space-between; align-items:center; background:var(--background); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:16px;">
                         <div>
                             <span class="current-price" style="font-size:24px;">₹${med.price.toFixed(2)}</span>
-                            <span class="original-price" style="font-size:14px; margin-left:8px;">₹${med.original_price.toFixed(2)}</span>
+                            <span class="original-price" style="font-size:14px; margin-left:8px;">₹${(med.original_price || med.price * 1.15).toFixed(2)}</span>
                         </div>
                         <span style="color:var(--secondary); font-weight:800; font-size:13px;">In Stock (${med.stock} units)</span>
                     </div>
@@ -324,9 +468,9 @@ export class CustomerModule {
                     <div style="font-size:13px; line-height:1.6; margin-bottom:16px;">
                         <strong>Description:</strong> ${med.description}<br><br>
                         <strong>Dosage:</strong> ${med.dosage}<br>
-                        <strong>Manufacturer:</strong> ${med.manufacturer}<br>
-                        <strong>Expiry Date:</strong> ${med.expiry_date}<br>
-                        <strong>Side Effects:</strong> ${med.side_effects}
+                        <strong>Manufacturer:</strong> ${med.manufacturer || 'Certified Pharma'}<br>
+                        <strong>Expiry Date:</strong> ${med.expiry_date || '2027-12'}<br>
+                        <strong>Side Effects:</strong> ${med.side_effects || 'Mild dizziness, nausea'}
                     </div>
 
                     <div style="display:flex; gap:12px;">
@@ -482,7 +626,7 @@ export class CustomerModule {
                             <label style="font-size:12px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">DELIVERY ADDRESS</label>
                             <input type="text" id="deliveryAddressInput" value="${(() => {
                                 const u = this.app.authService.getUser();
-                                if (!u || !u.address) return 'Flat 402, Block B, Sector 18, Noida';
+                                if (!u || !u.address) return googleMapsService.getUserLocation().label;
                                 return typeof u.address === 'string' ? u.address : `${u.address.street || ''}, ${u.address.city || ''}`;
                             })()}" 
                                    style="width:100%; border:1px solid var(--card-border); padding:10px 14px; border-radius:var(--radius-md); font-size:13px;">
@@ -521,6 +665,7 @@ export class CustomerModule {
         return enriched.map(med => {
             const isOpen = med.pharmacy_status === 'open';
             const inStock = med.stock > 0;
+            const isGoogleDiscovered = med.isGooglePlaceUnregistered;
 
             return `
                 <div class="med-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative;">
@@ -544,9 +689,9 @@ export class CustomerModule {
                             🏢 Mfr: <strong>${med.manufacturer}</strong>
                         </div>
 
-                        <!-- 5. Stock Status -->
-                        <div style="font-size:11px; font-weight:700; margin-bottom:8px; color:${inStock ? 'var(--secondary)' : 'var(--emergency-red)'};">
-                            📦 ${inStock ? `In Stock (${med.stock} units)` : 'Out of Stock'}
+                        <!-- 5. Stock Status / Google Unregistered Notice -->
+                        <div style="font-size:11px; font-weight:700; margin-bottom:8px; color:${isGoogleDiscovered ? 'var(--text-muted)' : (inStock ? 'var(--secondary)' : 'var(--emergency-red)')};">
+                            ${isGoogleDiscovered ? '⚠️ Medicine availability not available' : (inStock ? `📦 In Stock (${med.stock} units)` : '📦 Out of Stock')}
                         </div>
 
                         <!-- 6. Pharmacy, 7. Distance, 8. Open/Closed, 9. Rating, 10. Delivery -->
@@ -575,7 +720,7 @@ export class CustomerModule {
                             <span class="current-price">₹${med.price.toFixed(2)}</span>
                             <span class="original-price">₹${(med.price * 1.15).toFixed(2)}</span>
                         </div>
-                        <button class="add-cart-btn" ${!inStock ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} onclick="MediApp.addToCart('${med.id}')">
+                        <button class="add-cart-btn" ${(!inStock || isGoogleDiscovered) ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} onclick="MediApp.addToCart('${med.id}')">
                             <i class="fa-solid fa-plus"></i> Add
                         </button>
                     </div>
@@ -619,10 +764,9 @@ export class CustomerModule {
     renderSearchPage() {
         const dbMeds = Array.from(firestoreDb.collections.Medicines.values());
         const allMedicines = dbMeds.length > 0 ? dbMeds : this.app.state.medicines;
-        const dbPharmacies = Array.from(firestoreDb.collections.Pharmacies.values());
-        const allPharmacies = dbPharmacies.length > 0 ? dbPharmacies : MOCK_PHARMACIES;
+        const pharmacies = googleMapsService.getPharmacies();
 
-        this.searchEngine.setDatasets(allMedicines, allPharmacies);
+        this.searchEngine.setDatasets(allMedicines, pharmacies);
         const { results, spellingCorrection, alternatives } = this.searchEngine.search(this.searchQuery, this.selectedCategory);
 
         return `
@@ -737,9 +881,10 @@ export class CustomerModule {
     }
 
     renderProfilePage() {
-        const user = this.app.authService.getUser() || { name: 'Alex Johnson', email: 'alex@example.com', phone: '+91 98765 43210' };
+        const user = this.app.authService.getUser() || { name: 'Customer User', email: 'user@example.com', phone: '+91 98765 43210' };
         const savedAddresses = this.app.state.savedAddresses || [];
-        const favoritePharmacies = MOCK_PHARMACIES.filter(p => (this.app.state.favoritePharmacies || []).includes(p.id));
+        const pharmacies = googleMapsService.getPharmacies();
+        const favoritePharmacies = pharmacies.filter(p => (this.app.state.favoritePharmacies || []).includes(p.id));
 
         return `
             <header class="navbar-top">
@@ -787,7 +932,7 @@ export class CustomerModule {
                             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:8px;">
                                 <div>
                                     <strong>${p.shop_name}</strong>
-                                    <div style="font-size:12px; color:var(--text-muted);">${p.address}</div>
+                                    <div style="font-size:12px; color:var(--text-muted);">${p.address} • 📍 ${p.distance}</div>
                                 </div>
                                 <button class="btn-secondary" onclick="MediApp.viewPharmacyDetails('${p.id}')">Visit Store</button>
                             </div>
