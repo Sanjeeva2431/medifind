@@ -559,15 +559,23 @@ class MediFindApp {
         this.paymentService.openRazorpayCheckout(amount);
     }
 
+    selectPaymentMethod(method, amount) {
+        this.paymentService.selectPaymentMethod(method, amount);
+    }
+
+    submitDemoPayment(method, amount) {
+        this.paymentService.submitDemoPayment(method, amount);
+    }
+
     processPayment(method, amount) {
-        this.paymentService.processPayment(method, amount);
+        this.paymentService.submitDemoPayment(method, amount);
     }
 
     simulatePaymentFailure(amount) {
         this.paymentService.handlePaymentFailure(amount);
     }
 
-    completeCheckoutOrder(txId, paymentMethod, amount) {
+    completeCheckoutOrder(txId, paymentMethod, amount, paymentStatus = 'Paid') {
         const currentUser = this.authService.getUser();
         const userId = currentUser ? currentUser.id : `usr_guest_${Date.now()}`;
         const userName = currentUser ? currentUser.name : 'Guest Customer';
@@ -590,9 +598,10 @@ class MediFindApp {
             items: [...this.state.cart],
             total_amount: amount || 150.00,
             payment_method: paymentMethod,
-            payment_status: paymentMethod === 'COD' ? 'Pending COD' : 'Paid',
-            order_status: 'Out for Delivery',
-            tracking_step: 4,
+            payment_status: paymentStatus || (paymentMethod === 'COD' ? 'Pending COD' : 'Paid'),
+            payment_id: txId,
+            order_status: 'Confirmed',
+            tracking_step: 1,
             created_at: new Date().toISOString(),
             delivery_partner: {
                 id: 'partner_1',
@@ -608,7 +617,7 @@ class MediFindApp {
         this.state.cart = [];
         this.closeModal();
         this.setCustomerTab('orders');
-        this.showToast(`🎉 Payment Success! Order ${newOrderId} Placed (${paymentMethod})`);
+        this.showToast(paymentMethod === 'COD' ? `🎉 COD Order ${newOrderId} Placed!` : `🎉 Payment Successful! Order ${newOrderId} Confirmed`);
         this.openTrackingModal(newOrderId);
     }
 
