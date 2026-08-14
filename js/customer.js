@@ -84,25 +84,16 @@ export class CustomerModule {
                         <button class="voice-btn" onclick="event.stopPropagation(); MediApp.openVoiceSearchModal()" title="Voice Search">
                             <i class="fa-solid fa-microphone"></i>
                         </button>
-                        <button class="camera-rx-btn" onclick="event.stopPropagation(); MediApp.setCustomerTab('prescription')" title="Upload Prescription">
-                            <i class="fa-solid fa-file-prescription"></i>
-                        </button>
                     </div>
                 </section>
 
-                <!-- Quick Mobile Action Grid (4 Primary Mobile Actions) -->
-                <div class="quick-action-grid">
+                <!-- Quick Mobile Action Grid (Primary Mobile Actions) -->
+                <div class="quick-action-grid" style="grid-template-columns: repeat(3, 1fr);">
                     <div class="quick-action-card" onclick="MediApp.setCustomerTab('search')">
                         <div class="quick-action-icon" style="background:var(--primary-light); color:var(--primary);">
                             <i class="fa-solid fa-pills"></i>
                         </div>
                         <span class="quick-action-title">Search Medicine</span>
-                    </div>
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('prescription')">
-                        <div class="quick-action-icon" style="background:var(--secondary-light); color:var(--secondary);">
-                            <i class="fa-solid fa-file-arrow-up"></i>
-                        </div>
-                        <span class="quick-action-title">Upload Rx</span>
                     </div>
                     <div class="quick-action-card" onclick="MediApp.setCustomerTab('pharmacies')">
                         <div class="quick-action-icon" style="background:var(--warning-light); color:var(--warning-amber);">
@@ -131,18 +122,6 @@ export class CustomerModule {
                         </button>
                     </div>
                 ` : ''}
-
-                <!-- Quick Prescription Banner Card -->
-                <div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color:white; border-radius:var(--radius-lg); padding:18px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; box-shadow:0 8px 16px rgba(34,197,94,0.25);">
-                    <div>
-                        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">AI PRESCRIPTION SCANNER</div>
-                        <div style="font-size:16px; font-weight:800;">Have a Doctor's Prescription?</div>
-                        <div style="font-size:12px; opacity:0.9;">Upload photo to auto-extract items and place order</div>
-                    </div>
-                    <button class="emergency-btn" style="color:#16a34a;" onclick="MediApp.setCustomerTab('prescription')">
-                        <i class="fa-solid fa-file-arrow-up"></i> Upload Rx
-                    </button>
-                </div>
 
                 <!-- Categories -->
                 <section style="margin-bottom: 24px;">
