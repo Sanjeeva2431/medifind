@@ -157,36 +157,58 @@ export class GoogleMapsService {
     // IP-Based Geolocation Fallback
     async fallbackToIpLocation(reasonMsg = 'Located via IP') {
         try {
-            const ipRes = await fetch('/api/places/ip-location');
-            if (ipRes.ok) {
-                const ipData = await ipRes.json();
-                if (ipData && ipData.success) {
-                    this.currentLocation = {
-                        lat: ipData.lat,
-                        lng: ipData.lng,
-                        label: ipData.formatted_address || `${ipData.city}, ${ipData.region}`,
-                        isLiveGps: false,
-                        isIpLocation: true,
-                        accuracy: 1000
-                    };
-                    this.locationState = {
-                        status: 'granted',
-                        errorMessage: '',
-                        isLiveGps: false,
-                        isIpLocation: true
-                    };
-                    localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
-
-                    await this.fetchNearbyPharmacies(ipData.lat, ipData.lng);
-
-                    if (window.MediApp) window.MediApp.render();
-
-                    return {
-                        success: true,
-                        location: this.currentLocation,
-                        message: `📍 City Detected via IP: ${this.currentLocation.label}`
-                    };
+            let ipData = null;
+            try {
+                const ipRes = await fetch('/api/places/ip-location');
+                if (ipRes.ok) {
+                    ipData = await ipRes.json();
                 }
+            } catch (e) {
+                // Fallback to direct client-side IP lookup if backend proxy is unreachable on mobile device
+                try {
+                    const clientIpRes = await fetch('http://ip-api.com/json/');
+                    if (clientIpRes.ok) {
+                        const raw = await clientIpRes.json();
+                        if (raw && raw.status === 'success') {
+                            ipData = {
+                                success: true,
+                                lat: raw.lat,
+                                lng: raw.lon,
+                                formatted_address: `${raw.city}, ${raw.regionName}`
+                            };
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[Client IP Lookup Failed]:', err);
+                }
+            }
+
+            if (ipData && ipData.success) {
+                this.currentLocation = {
+                    lat: ipData.lat,
+                    lng: ipData.lng,
+                    label: ipData.formatted_address || `${ipData.city}, ${ipData.region}`,
+                    isLiveGps: false,
+                    isIpLocation: true,
+                    accuracy: 1000
+                };
+                this.locationState = {
+                    status: 'granted',
+                    errorMessage: '',
+                    isLiveGps: false,
+                    isIpLocation: true
+                };
+                localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
+
+                await this.fetchNearbyPharmacies(ipData.lat, ipData.lng);
+
+                if (window.MediApp) window.MediApp.render();
+
+                return {
+                    success: true,
+                    location: this.currentLocation,
+                    message: `📍 City Detected via IP: ${this.currentLocation.label}`
+                };
             }
         } catch (e) {
             console.warn('[IP Location Fallback Error]:', e);
@@ -204,7 +226,7 @@ export class GoogleMapsService {
         localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
         if (window.MediApp) window.MediApp.render();
 
-        return { success: true, location: this.currentLocation, message: '📍 Default City Set: Anna Nagar, Chennai' };
+        return { success: true, location: this.currentLocation, message: '📍 Location Set: Anna Nagar, Chennai' };
     }
 
     // 2. Set Manual City / Address Location
