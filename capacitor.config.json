@@ -1,5 +1,5 @@
 {
-  "appId": "health.medifind.app",
+  "appId": "com.medifind.app",
   "appName": "MediFind",
   "webDir": "dist",
   "server": {

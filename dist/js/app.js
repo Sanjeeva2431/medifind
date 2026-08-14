@@ -75,7 +75,37 @@ class MediFindApp {
 
         this.showSplashScreen();
         this.render();
+        this.initAndroidBackButton();
         this.showToast('MediFind Application Ready 🏥');
+    }
+
+    initAndroidBackButton() {
+        if (window.Capacitor && window.Capacitor.isPluginAvailable('App')) {
+            import('@capacitor/app').then(({ App }) => {
+                App.addListener('backButton', () => {
+                    if (this.activeModal) {
+                        this.closeModal();
+                    } else if (this.state.customerTab !== 'home') {
+                        this.setCustomerTab('home');
+                    } else {
+                        App.exitApp();
+                    }
+                });
+            }).catch(e => console.log('[Back Button Listener Note]:', e));
+        }
+
+        window.addEventListener('offline', () => {
+            this.showModal(`
+                <div class="modal-card" style="max-width:380px; padding:24px; text-align:center;">
+                    <div style="font-size:44px; color:var(--emergency-red); margin-bottom:12px;"><i class="fa-solid fa-wifi"></i></div>
+                    <h3 style="font-size:18px; margin-bottom:6px;">No Internet Connection</h3>
+                    <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">MediFind requires an internet connection to load live pharmacies and medicines.</p>
+                    <button class="add-cart-btn" style="width:100%; justify-content:center;" onclick="window.location.reload()">
+                        <i class="fa-solid fa-rotate-right"></i> Retry
+                    </button>
+                </div>
+            `);
+        });
     }
 
     showSplashScreen() {
