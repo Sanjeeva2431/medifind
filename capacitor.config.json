@@ -1,0 +1,9 @@
+{
+  "appId": "health.medifind.app",
+  "appName": "MediFind",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}
