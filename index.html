@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediFind - Real-Time Medicine Finder & Home Delivery</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="MediFind - Find Medicines. Find Pharmacies. Get Care Faster. Real-Time Medicine Finder & 15-Minute Home Delivery Platform.">
+    <title>MediFind - Find Medicines. Find Pharmacies. Get Care Faster.</title>
+    
+    <!-- PWA Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2965/2965567.png">
+    
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +34,7 @@
                 navigator.serviceWorker.register('sw.js')
                     .then(reg => {
                         reg.update();
-                        console.log('⚡ MediFind Service Worker Registered:', reg.scope);
+                        console.log('⚡ MediFind PWA Service Worker Active:', reg.scope);
                     })
                     .catch(err => console.log('Service Worker Registration Fallback:', err));
             });

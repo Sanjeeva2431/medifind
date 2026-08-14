@@ -26,6 +26,7 @@ export class CustomerModule {
         if (tab === 'cart') return this.renderCartPage();
         if (tab === 'orders') return this.renderOrdersPage();
         if (tab === 'profile') return this.renderProfilePage();
+        if (tab === 'emergency') return this.renderEmergencyPage();
         return this.renderHome();
     }
 
@@ -45,7 +46,10 @@ export class CustomerModule {
             <header class="navbar-top">
                 <div class="brand-logo" onclick="MediApp.setCustomerTab('home')">
                     <div class="brand-icon"><i class="fa-solid fa-notes-medical"></i></div>
-                    <span class="brand-text">MediFind</span>
+                    <div>
+                        <span class="brand-text">MediFind</span>
+                        <div style="font-size:9px; color:var(--text-muted); font-weight:600; white-space:nowrap; margin-top:-2px;">Find Medicines. Find Pharmacies. Get Care Faster.</div>
+                    </div>
                 </div>
 
                 <div class="location-selector" onclick="MediApp.openAddressModal()">
@@ -55,9 +59,6 @@ export class CustomerModule {
                 </div>
 
                 <div class="top-actions">
-                    <button class="role-badge-btn" onclick="MediApp.openAccountModal()">
-                        <i class="fa-solid fa-user"></i> Account
-                    </button>
                     <button class="icon-btn" onclick="MediApp.toggleTheme()" title="Toggle Dark/Light Mode">
                         <i class="fa-solid ${this.app.state.darkMode ? 'fa-sun' : 'fa-moon'}"></i>
                     </button>
@@ -73,7 +74,7 @@ export class CustomerModule {
                 ${this.renderLocationStateBanner(locState, userLoc)}
 
                 <!-- Search Hero Banner -->
-                <section class="search-hero" style="margin-top:12px;">
+                <section class="search-hero" style="margin-top:12px; margin-bottom:16px;">
                     <h2 class="search-title">Fast 15-Minute Medicine Delivery ⚡</h2>
                     <p class="search-subtitle">Order genuine medicines from verified nearby pharmacies at lowest prices</p>
                     
@@ -88,6 +89,34 @@ export class CustomerModule {
                         </button>
                     </div>
                 </section>
+
+                <!-- Quick Mobile Action Grid (4 Primary Mobile Actions) -->
+                <div class="quick-action-grid">
+                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('search')">
+                        <div class="quick-action-icon" style="background:var(--primary-light); color:var(--primary);">
+                            <i class="fa-solid fa-pills"></i>
+                        </div>
+                        <span class="quick-action-title">Search Medicine</span>
+                    </div>
+                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('prescription')">
+                        <div class="quick-action-icon" style="background:var(--secondary-light); color:var(--secondary);">
+                            <i class="fa-solid fa-file-arrow-up"></i>
+                        </div>
+                        <span class="quick-action-title">Upload Rx</span>
+                    </div>
+                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('pharmacies')">
+                        <div class="quick-action-icon" style="background:var(--warning-light); color:var(--warning-amber);">
+                            <i class="fa-solid fa-store"></i>
+                        </div>
+                        <span class="quick-action-title">Pharmacies</span>
+                    </div>
+                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('emergency')">
+                        <div class="quick-action-icon" style="background:var(--emergency-light); color:var(--emergency-red);">
+                            <i class="fa-solid fa-truck-medical"></i>
+                        </div>
+                        <span class="quick-action-title">Emergency</span>
+                    </div>
+                </div>
 
                 ${activeOrder ? `
                     <!-- Active Live Order Banner -->
@@ -904,6 +933,57 @@ export class CustomerModule {
                     </div>
                 </div>
 
+                <!-- Profile Options List -->
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:8px; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.setCustomerTab('orders')">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-box-archive" style="color:var(--primary); font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">My Orders History</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openAddressModal()">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-map-location-dot" style="color:var(--secondary); font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">Saved Addresses</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.setCustomerTab('prescription')">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-file-prescription" style="color:var(--warning-amber); font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">Prescription History</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openNotificationsModal()">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-bell" style="color:#9333ea; font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">Notifications</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openHelpSupportModal()">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-circle-question" style="color:#0ea5e9; font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">Help & Support</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; cursor:pointer;" onclick="MediApp.openAboutModal()">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-circle-info" style="color:var(--text-muted); font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">About MediFind</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+                </div>
+
                 <!-- Saved Favorite Pharmacies -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:18px;">
                     <h3 style="font-size:16px; margin-bottom:12px;"><i class="fa-solid fa-heart" style="color:var(--emergency-red);"></i> Favorite Pharmacies</h3>
@@ -920,6 +1000,73 @@ export class CustomerModule {
                             </div>
                         `).join('')}
                     </div>
+                </div>
+            </main>
+            ${this.renderBottomNav()}
+        `;
+    }
+
+    // 9. Emergency 24/7 Pharmacy View
+    renderEmergencyPage() {
+        const userLoc = googleMapsService.getUserLocation();
+        const pharmacies = googleMapsService.getPharmacies();
+
+        return `
+            <header class="navbar-top">
+                <button class="icon-btn" onclick="MediApp.setCustomerTab('home')"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 style="font-size:18px; flex:1; color:var(--emergency-red);"><i class="fa-solid fa-truck-medical"></i> Emergency 24/7 Pharmacies</h2>
+                <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
+                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                </button>
+            </header>
+
+            <main class="main-content">
+                <div style="background:var(--emergency-light); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:16px; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; color:var(--emergency-red); font-weight:800; font-size:15px; margin-bottom:4px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Emergency Medical Support Active
+                    </div>
+                    <div style="font-size:12px; color:var(--text-body);">
+                        Showing open 24/7 verified emergency pharmacies near <strong>${userLoc.label}</strong>. Call directly for urgent medicine supply.
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    ${pharmacies.map(p => `
+                        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:18px; box-shadow:var(--shadow-sm);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="display:flex; gap:12px; align-items:center;">
+                                    <img src="${p.logo}" style="width:54px; height:54px; border-radius:var(--radius-md); object-fit:cover;">
+                                    <div>
+                                        <div style="font-weight:800; font-size:16px; color:var(--text-main);">${p.shop_name}</div>
+                                        <div style="font-size:12px; color:var(--text-muted);">${p.address}</div>
+                                    </div>
+                                </div>
+                                <span style="background:var(--secondary-light); color:var(--secondary); font-weight:800; font-size:11px; padding:4px 8px; border-radius:4px; white-space:nowrap;">
+                                    🟢 OPEN 24/7
+                                </span>
+                            </div>
+
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; color:var(--primary); margin-bottom:14px; background:var(--background); padding:8px 12px; border-radius:var(--radius-sm);">
+                                <span>📍 ${p.distance} away from you</span>
+                                <span>⭐ ${p.rating} (${p.reviews_count || 12} reviews)</span>
+                            </div>
+
+                            <div style="display:flex; gap:10px;">
+                                ${p.phone ? `
+                                    <a href="tel:${p.phone}" class="add-cart-btn" style="flex:1; justify-content:center; text-decoration:none; background:var(--emergency-red); border-color:var(--emergency-red);">
+                                        <i class="fa-solid fa-phone"></i> Call Pharmacy
+                                    </a>
+                                ` : `
+                                    <a href="tel:+919876543210" class="add-cart-btn" style="flex:1; justify-content:center; text-decoration:none; background:var(--emergency-red); border-color:var(--emergency-red);">
+                                        <i class="fa-solid fa-phone"></i> Call Pharmacy
+                                    </a>
+                                `}
+                                <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="btn-secondary" style="flex:1; justify-content:center; text-decoration:none; align-items:center;">
+                                    <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+                                </a>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </main>
             ${this.renderBottomNav()}

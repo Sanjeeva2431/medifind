@@ -73,8 +73,34 @@ class MediFindApp {
         // Enable position watcher for real-time updates when moving
         googleMapsService.startWatchPosition();
 
+        this.showSplashScreen();
         this.render();
         this.showToast('MediFind Application Ready 🏥');
+    }
+
+    showSplashScreen() {
+        if (sessionStorage.getItem('medifind_splash_shown')) return;
+        sessionStorage.setItem('medifind_splash_shown', 'true');
+
+        const splash = document.createElement('div');
+        splash.className = 'splash-screen';
+        splash.innerHTML = `
+            <div class="splash-logo">
+                <i class="fa-solid fa-notes-medical"></i>
+            </div>
+            <h1 style="font-size:28px; font-weight:800; color:white; margin-bottom:4px;">MediFind</h1>
+            <p style="font-size:13px; color:#94a3b8; font-weight:600; text-align:center; max-width:280px; margin:0 auto;">
+                Find Medicines. Find Pharmacies. Get Care Faster.
+            </p>
+            <div style="margin-top:24px;" class="loading-spinner"></div>
+        `;
+        document.body.appendChild(splash);
+
+        setTimeout(() => {
+            splash.style.opacity = '0';
+            splash.style.visibility = 'hidden';
+            setTimeout(() => splash.remove(), 500);
+        }, 1200);
     }
 
     render() {
@@ -1290,6 +1316,50 @@ class MediFindApp {
         this.closeModal();
         this.showToast(`📍 Selected Address: ${label}`);
         this.render();
+    }
+
+    openHelpSupportModal() {
+        this.showModal(`
+            <div class="modal-card" style="max-width:440px; padding:24px;">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <div style="text-align:center; margin-bottom:16px;">
+                    <div style="width:56px; height:56px; background:var(--primary-light); color:var(--primary); border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 10px auto;">
+                        <i class="fa-solid fa-headset"></i>
+                    </div>
+                    <h3 style="font-size:18px;">MediFind 24/7 Support</h3>
+                    <p style="font-size:12px; color:var(--text-muted);">We are here to help you with medicine orders, prescription uploads, or pharmacy queries.</p>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                    <a href="tel:+919876543210" class="add-cart-btn" style="justify-content:center; text-decoration:none;">
+                        <i class="fa-solid fa-phone"></i> Call Emergency Support (+91 98765 43210)
+                    </a>
+                    <a href="mailto:support@medifind.health" class="btn-secondary" style="justify-content:center; text-decoration:none;">
+                        <i class="fa-solid fa-envelope"></i> Email Customer Care
+                    </a>
+                </div>
+                <button class="btn-secondary" style="width:100%; justify-content:center;" onclick="MediApp.closeModal()">Close</button>
+            </div>
+        `);
+    }
+
+    openAboutModal() {
+        this.showModal(`
+            <div class="modal-card" style="max-width:440px; padding:24px; text-align:center;">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <div class="splash-logo" style="margin:0 auto 14px auto; width:64px; height:64px; font-size:32px;">
+                    <i class="fa-solid fa-notes-medical"></i>
+                </div>
+                <h2 style="font-size:20px; font-weight:800; margin-bottom:2px;">MediFind</h2>
+                <div style="font-size:12px; color:var(--primary); font-weight:700; margin-bottom:12px;">"Find Medicines. Find Pharmacies. Get Care Faster."</div>
+                <p style="font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:16px;">
+                    MediFind is a modern, mobile-first real-time medicine discovery and 15-minute home delivery platform built for final-year project demonstration using HTML5 Geolocation, Google Places API, PWA, and Socket.IO.
+                </p>
+                <div style="font-size:11px; color:var(--text-muted); background:var(--background); padding:10px; border-radius:var(--radius-md); margin-bottom:16px;">
+                    Version 2.5.0 • PWA Enabled • License: Open Demonstration
+                </div>
+                <button class="add-cart-btn" style="width:100%; justify-content:center;" onclick="MediApp.closeModal()">Got it!</button>
+            </div>
+        `);
     }
 }
 
