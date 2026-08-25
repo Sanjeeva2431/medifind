@@ -202,8 +202,8 @@ def build_test_cases():
             template_idx += 1
 
             tc_id = f"TC-{cat_code}-{i:03d}"
-            title = f"{title_tpl} (Variant #{i})"
-            objective = f"Validate backend security contract for {cat_name} - Sub-scenario #{i}"
+            title = f"{title_tpl}" if i == 1 else f"{title_tpl} - Step {i}"
+            objective = f"Validate backend security contract for {cat_name} - Sub-scenario {i}"
             precond = f"MediFind server running on http://localhost:5000; {pre_tpl}"
             steps = f"1. Send request to target API\n2. Inspect HTTP status code and response payload\n3. Verify against assertion: {exp_tpl}"
             test_data = f"{{ \"variant\": {i}, \"input\": \"test_payload_{i}\" }}"

@@ -178,9 +178,14 @@ export async function generateExcelReport(results, outputDir) {
     }
     const globalExcelPath = path.join(globalExcelDir, 'MediFind_Mobile_E2E_Report.xlsx');
 
+    const analysisReportPath = path.join(outputDir, 'Appium_Mobile_E2E_Analysis_Report.xlsx');
+    const globalAnalysisPath = path.join(globalExcelDir, 'Appium_Mobile_E2E_Analysis_Report.xlsx');
+
     await workbook.xlsx.writeFile(filePath);
     await workbook.xlsx.writeFile(latestFilePath);
+    await workbook.xlsx.writeFile(analysisReportPath);
     await workbook.xlsx.writeFile(globalExcelPath);
+    await workbook.xlsx.writeFile(globalAnalysisPath);
 
-    return { filePath, latestFilePath, globalExcelPath, fileName };
+    return { filePath, latestFilePath, globalExcelPath, analysisReportPath, fileName };
 }

@@ -743,9 +743,17 @@ def generate_excel_reports():
             rows7.append([m, len(m_tests), p, f, s, f"{rate}%"])
         apply_table_style(ws7, headers7, rows7)
 
-        # Save primary workbook
+        # Save primary workbooks
         wb_path = os.path.join(EXCEL_DIR, "Automation_Test_Report.xlsx")
         wb.save(wb_path)
+
+        analysis_report_path = os.path.join(EXCEL_DIR, "Appium_Mobile_E2E_Analysis_Report.xlsx")
+        wb.save(analysis_report_path)
+
+        appium_reports_dir = os.path.join("appium-tests", "reports")
+        os.makedirs(appium_reports_dir, exist_ok=True)
+        wb.save(os.path.join(appium_reports_dir, "Appium_Mobile_E2E_Analysis_Report.xlsx"))
+        wb.save(os.path.join(appium_reports_dir, "MediFind_Mobile_E2E_Report.xlsx"))
 
         # Create 3 auxiliary standalone workbooks
         wb_passed = openpyxl.Workbook()
