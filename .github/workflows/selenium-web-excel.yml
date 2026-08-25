@@ -29,14 +29,15 @@ jobs:
           mkdir -p selenium-tests/reports
           cp "Test Results/Excel/Selenium_Web_E2E_Analysis_Report.xlsx" "selenium-tests/reports/Selenium_Web_E2E_Analysis_Report.xlsx" 2>/dev/null || cp "Test Results/Excel/Automation_Test_Report.xlsx" "selenium-tests/reports/Selenium_Web_E2E_Analysis_Report.xlsx" 2>/dev/null || true
 
-      - name: 📦 Stage 4: Upload Artifact
+      - name: 📦 Stage 4: Upload Artifact (Exactly 3 Core Excel Files)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Selenium-Web-Excel-Analysis-Report
           path: |
-            selenium-tests/reports/
-            Test Results/Excel/
+            Test Results/Excel/Automation_Test_Report.xlsx
+            Test Results/Excel/Passed_Test_Cases.xlsx
+            Test Results/Excel/Failed_Test_Cases.xlsx
           if-no-files-found: ignore
           retention-days: 30
 

@@ -708,13 +708,8 @@ def generate_excel():
             rows6 = [["DEF-000", "N/A", "N/A", "Zero defects on live GitHub Pages deployment", "N/A"]]
         format_sheet(ws6, "🐛 Defect Summary Log", ["Defect ID", "Test Case ID", "Module", "Title", "Defect Description"], rows6)
 
+        # 1. Automation_Test_Report.xlsx (Master Workbook)
         wb_auto.save(os.path.join(EXCEL_DIR, "Automation_Test_Report.xlsx"))
-        wb_auto.save(os.path.join(EXCEL_DIR, "Selenium_Web_E2E_Analysis_Report.xlsx"))
-
-        selenium_reports_dir = os.path.join("selenium-tests", "reports")
-        os.makedirs(selenium_reports_dir, exist_ok=True)
-        wb_auto.save(os.path.join(selenium_reports_dir, "Selenium_Web_E2E_Analysis_Report.xlsx"))
-        wb_auto.save(os.path.join(selenium_reports_dir, "MediFind_Web_Selenium_Report.xlsx"))
 
         # 2. Failed_Test_Cases.xlsx
         wb_fail = openpyxl.Workbook()
@@ -730,14 +725,14 @@ def generate_excel():
         format_sheet(ws_p, "✅ Passed Live Test Cases", ["Test ID", "Module", "Test Name", "Status", "Execution Time"], rows2)
         wb_pass.save(os.path.join(EXCEL_DIR, "Passed_Test_Cases.xlsx"))
 
-        # 4. Summary_Report.xlsx
-        wb_sum = openpyxl.Workbook()
-        ws_s = wb_sum.active
-        ws_s.title = "Summary Report"
-        format_sheet(ws_s, "📈 Live Execution Summary Dashboard", ["Metric Name", "Metric Value"], rows5)
-        wb_sum.save(os.path.join(EXCEL_DIR, "Summary_Report.xlsx"))
+        # Sync exactly these 3 Excel files to selenium-tests/reports/
+        selenium_reports_dir = os.path.join("selenium-tests", "reports")
+        os.makedirs(selenium_reports_dir, exist_ok=True)
+        import shutil
+        for f_name in ["Automation_Test_Report.xlsx", "Passed_Test_Cases.xlsx", "Failed_Test_Cases.xlsx"]:
+            shutil.copy(os.path.join(EXCEL_DIR, f_name), os.path.join(selenium_reports_dir, f_name))
 
-        print("[OK] Excel Reports generated successfully in Test Results/Excel/")
+        print("[OK] Exactly 3 Excel Reports generated successfully in Test Results/Excel/")
     except Exception as e:
         print(f"[NOTICE] Excel Generation Notice: {e}")
 

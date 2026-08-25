@@ -743,36 +743,32 @@ def generate_excel_reports():
             rows7.append([m, len(m_tests), p, f, s, f"{rate}%"])
         apply_table_style(ws7, headers7, rows7)
 
-        # Save primary workbooks
+        # 1. Automation_Test_Report.xlsx (Master Workbook)
         wb_path = os.path.join(EXCEL_DIR, "Automation_Test_Report.xlsx")
         wb.save(wb_path)
 
-        analysis_report_path = os.path.join(EXCEL_DIR, "Appium_Mobile_E2E_Analysis_Report.xlsx")
-        wb.save(analysis_report_path)
-
-        appium_reports_dir = os.path.join("appium-tests", "reports")
-        os.makedirs(appium_reports_dir, exist_ok=True)
-        wb.save(os.path.join(appium_reports_dir, "Appium_Mobile_E2E_Analysis_Report.xlsx"))
-        wb.save(os.path.join(appium_reports_dir, "MediFind_Mobile_E2E_Report.xlsx"))
-
-        # Create 3 auxiliary standalone workbooks
+        # 2. Passed_Test_Cases.xlsx
         wb_passed = openpyxl.Workbook()
         ws_p = wb_passed.active
         ws_p.title = "Passed Test Cases"
         apply_table_style(ws_p, headers1, rows2)
         wb_passed.save(os.path.join(EXCEL_DIR, "Passed_Test_Cases.xlsx"))
 
+        # 3. Failed_Test_Cases.xlsx
         wb_failed = openpyxl.Workbook()
         ws_f = wb_failed.active
         ws_f.title = "Failed Test Cases"
         apply_table_style(ws_f, headers3, rows3)
         wb_failed.save(os.path.join(EXCEL_DIR, "Failed_Test_Cases.xlsx"))
 
-        wb_summary = openpyxl.Workbook()
-        ws_s = wb_summary.active
-        ws_s.title = "Execution Summary"
-        apply_table_style(ws_s, headers5, rows5)
-        wb_summary.save(os.path.join(EXCEL_DIR, "Execution_Summary.xlsx"))
+        # Sync exactly these 3 Excel files to appium-tests/reports/
+        appium_reports_dir = os.path.join("appium-tests", "reports")
+        os.makedirs(appium_reports_dir, exist_ok=True)
+        import shutil
+        for f_name in ["Automation_Test_Report.xlsx", "Passed_Test_Cases.xlsx", "Failed_Test_Cases.xlsx"]:
+            shutil.copy(os.path.join(EXCEL_DIR, f_name), os.path.join(appium_reports_dir, f_name))
+
+        print("[OK] Exactly 3 Excel Reports generated successfully in Test Results/Excel/")
 
         print("[OK] Excel Reports generated successfully in Test Results/Excel/")
     except Exception as e:

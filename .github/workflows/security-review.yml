@@ -111,9 +111,9 @@ jobs:
         with:
           name: MediFind-Vulnerability-Audit-Results
           path: |
-            Vulnerability Test Results/
-            selenium-tests/reports/
-            appium-tests/reports/
+            Test Results/Excel/Automation_Test_Report.xlsx
+            Test Results/Excel/Passed_Test_Cases.xlsx
+            Test Results/Excel/Failed_Test_Cases.xlsx
           if-no-files-found: ignore
           retention-days: 30
 

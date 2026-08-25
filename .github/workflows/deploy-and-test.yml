@@ -126,9 +126,8 @@ jobs:
           name: Live-GitHub-Pages-E2E-Evidence-Reports
           path: |
             Test Results/Excel/Automation_Test_Report.xlsx
-            Test Results/Excel/Failed_Test_Cases.xlsx
             Test Results/Excel/Passed_Test_Cases.xlsx
-            Test Results/Excel/Summary_Report.xlsx
+            Test Results/Excel/Failed_Test_Cases.xlsx
             Test Results/HTML/execution-report.html
             Test Results/HTML/dashboard.html
             Test Results/JSON/execution-results.json

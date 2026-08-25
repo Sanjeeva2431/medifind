@@ -62,58 +62,15 @@ jobs:
           python3 scripts/generate_live_reports.py || true
           python3 scripts/generate_excel_audit.py || true
 
-      - name: 📦 Stage 1: Upload Appium Mobile Excel Analysis Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Appium-Mobile-Excel-Analysis-Report
-          path: |
-            appium-tests/reports/
-            Test Results/Excel/
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: 📦 Stage 2: Upload Baseline Load Test Excel Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Baseline-Load-Test-Excel-Report
-          path: Vulnerability Test Results/
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: 📦 Stage 3: Upload Python Appium Excel Analysis Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Python-Appium-Excel-Analysis-Report
-          path: |
-            appium-tests/reports/
-            Test Results/Excel/
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: 📦 Stage 4: Upload Selenium Web Excel Analysis Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Selenium-Web-Excel-Analysis-Report
-          path: |
-            selenium-tests/reports/
-            Test Results/Excel/
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: 📦 Stage 5: Upload Consolidated MediFind Test Reports
+      - name: 📦 Upload Consolidated MediFind Excel Test Reports (Exactly 3 Core Excel Files)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: MediFind-E2E-Excel-Test-Reports
           path: |
-            selenium-tests/reports/
-            appium-tests/reports/
-            Vulnerability Test Results/*.xlsx
-            Test Results/
+            Test Results/Excel/Automation_Test_Report.xlsx
+            Test Results/Excel/Passed_Test_Cases.xlsx
+            Test Results/Excel/Failed_Test_Cases.xlsx
           if-no-files-found: ignore
           retention-days: 30
 

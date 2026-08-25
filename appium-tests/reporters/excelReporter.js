@@ -167,25 +167,15 @@ export async function generateExcelReport(results, outputDir) {
         });
     });
 
-    const timestampStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const fileName = `MediFind_Mobile_E2E_Report_${timestampStr}.xlsx`;
-    const filePath = path.join(outputDir, fileName);
-    const latestFilePath = path.join(outputDir, 'MediFind_Mobile_E2E_Report.xlsx');
-
     const globalExcelDir = path.join(__dirname, '..', '..', 'Test Results', 'Excel');
     if (!fs.existsSync(globalExcelDir)) {
         fs.mkdirSync(globalExcelDir, { recursive: true });
     }
-    const globalExcelPath = path.join(globalExcelDir, 'MediFind_Mobile_E2E_Report.xlsx');
+    const autoReportPath = path.join(outputDir, 'Automation_Test_Report.xlsx');
+    const globalAutoPath = path.join(globalExcelDir, 'Automation_Test_Report.xlsx');
 
-    const analysisReportPath = path.join(outputDir, 'Appium_Mobile_E2E_Analysis_Report.xlsx');
-    const globalAnalysisPath = path.join(globalExcelDir, 'Appium_Mobile_E2E_Analysis_Report.xlsx');
+    await workbook.xlsx.writeFile(autoReportPath);
+    await workbook.xlsx.writeFile(globalAutoPath);
 
-    await workbook.xlsx.writeFile(filePath);
-    await workbook.xlsx.writeFile(latestFilePath);
-    await workbook.xlsx.writeFile(analysisReportPath);
-    await workbook.xlsx.writeFile(globalExcelPath);
-    await workbook.xlsx.writeFile(globalAnalysisPath);
-
-    return { filePath, latestFilePath, globalExcelPath, analysisReportPath, fileName };
+    return { filePath: autoReportPath, latestFilePath: autoReportPath, fileName: 'Automation_Test_Report.xlsx' };
 }

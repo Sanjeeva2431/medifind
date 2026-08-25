@@ -44,7 +44,10 @@ jobs:
         if: always()
         with:
           name: Verified-Evidence-Report-Bundle
-          path: Test Results/
+          path: |
+            Test Results/Excel/Automation_Test_Report.xlsx
+            Test Results/Excel/Passed_Test_Cases.xlsx
+            Test Results/Excel/Failed_Test_Cases.xlsx
           retention-days: 30
 
       - name: 📢 Stage 6: Publish Verification Summary

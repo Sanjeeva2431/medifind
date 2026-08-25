@@ -29,14 +29,15 @@ jobs:
           mkdir -p appium-tests/reports
           cp "Test Results/Excel/Summary_Report.xlsx" "appium-tests/reports/Python_Appium_Excel_Analysis_Report.xlsx" 2>/dev/null || true
 
-      - name: 📦 Stage 4: Upload Artifact
+      - name: 📦 Stage 4: Upload Artifact (Exactly 3 Core Excel Files)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Python-Appium-Excel-Analysis-Report
           path: |
-            appium-tests/reports/
-            Test Results/Excel/
+            Test Results/Excel/Automation_Test_Report.xlsx
+            Test Results/Excel/Passed_Test_Cases.xlsx
+            Test Results/Excel/Failed_Test_Cases.xlsx
           if-no-files-found: ignore
           retention-days: 30
 
