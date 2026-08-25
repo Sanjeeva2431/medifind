@@ -86,7 +86,7 @@ export class AiEngine {
         if (query.includes('emergency') || query.includes('insulin') || query.includes('heart')) {
             const emergencyMeds = MOCK_MEDICINES.filter(m => m.category === 'emergency' || m.category === 'diabetes' || m.category === 'cardiac').slice(0, 3);
             return {
-                reply: `🚨 Emergency Care Alert: Sanjeevani Emergency Pharmacy and Apollo 24/7 have critical emergency medicines and insulin in stock with express priority delivery.`,
+                reply: `🚨 Emergency Care Alert: Apollo Pharmacy 24/7 and MedPlus Superstore have critical emergency medicines and insulin in stock with express priority delivery.`,
                 type: 'medicines',
                 data: emergencyMeds
             };

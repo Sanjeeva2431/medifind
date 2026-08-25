@@ -1,9 +1,10 @@
 // MediFind Medicine Controller (Search, Catalog, Inventory CRUD)
+import { MedicineMongo } from '../models/mongoSchemas.js';
 
 export const medicineController = (medicineStore) => ({
     getAll: (req, res) => {
         const { category, search, pharmacy_id } = req.query;
-        let list = medicineStore.getAll();
+        let list = medicineStore.getAll().filter(m => !m.requires_prescription);
 
         if (pharmacy_id) {
             list = list.filter(m => m.pharmacy_id === pharmacy_id);
@@ -50,18 +51,75 @@ export const medicineController = (medicineStore) => ({
         };
 
         medicineStore.create(newMed);
+        MedicineMongo.create(newMed).catch(e => console.warn('[MedicineMongo Create Error]:', e.message));
+
+        if (req.io) {
+            req.io.emit('medicine_added', newMed);
+        }
         return res.status(201).json({ success: true, message: 'Medicine added to inventory', medicine: newMed });
     },
 
-    update: (req, res) => {
-        const updated = medicineStore.update(req.params.id, req.body);
-        if (!updated) return res.status(404).json({ success: false, message: 'Medicine not found' });
-        return res.json({ success: true, message: 'Medicine updated', medicine: updated });
+    update: async (req, res) => {
+        const { id } = req.params;
+        const { price, stock } = req.body;
+
+        if (price === undefined && stock === undefined) {
+            return res.status(400).json({ success: false, message: 'Price or stock value must be provided.' });
+        }
+
+        const parsedPrice = price !== undefined ? parseFloat(price) : undefined;
+        const parsedStock = stock !== undefined ? parseInt(stock) : undefined;
+
+        if (parsedPrice !== undefined && (isNaN(parsedPrice) || parsedPrice <= 0)) {
+            return res.status(400).json({ success: false, message: 'Price must be a valid positive number.' });
+        }
+        if (parsedStock !== undefined && (isNaN(parsedStock) || parsedStock < 0)) {
+            return res.status(400).json({ success: false, message: 'Stock must be a valid non-negative integer.' });
+        }
+
+        const updates = {};
+        if (parsedPrice !== undefined) updates.price = parsedPrice;
+        if (parsedStock !== undefined) updates.stock = parsedStock;
+
+        const updated = medicineStore.update(id, updates);
+        if (!updated) {
+            console.error(`❌ [Medicine Update Error]: Medicine ID "${id}" not found in database.`);
+            return res.status(404).json({ success: false, message: `Medicine "${id}" not found.` });
+        }
+
+        try {
+            await MedicineMongo.updateOne({ id }, { $set: updates }, { upsert: true });
+        } catch (e) {
+            console.warn('[MedicineMongo Update Note]:', e.message);
+        }
+
+        if (req.io) {
+            req.io.emit('medicine_updated', {
+                id: updated.id,
+                price: updated.price,
+                stock: updated.stock,
+                medicine: updated
+            });
+        }
+
+        console.log(`✅ [Medicine Controller]: Updated ID="${id}" -> Price=₹${updated.price}, Stock=${updated.stock} units`);
+        return res.json({ success: true, message: 'Medicine updated successfully', medicine: updated });
     },
 
-    delete: (req, res) => {
+    delete: async (req, res) => {
         const success = medicineStore.delete(req.params.id);
         if (!success) return res.status(404).json({ success: false, message: 'Medicine not found' });
+
+        try {
+            await MedicineMongo.deleteOne({ id: req.params.id });
+        } catch (e) {
+            console.warn('[MedicineMongo Delete Error]:', e.message);
+        }
+
+        if (req.io) {
+            req.io.emit('medicine_deleted', { id: req.params.id });
+        }
+
         return res.json({ success: true, message: 'Medicine deleted' });
     }
 });

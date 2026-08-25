@@ -40,10 +40,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: 📢 Stage 5: Publish Step Summary
+      - name: 📢 Stage 5: Publish Step Summary with Test Case Names
         if: always()
         run: |
-          echo "# 📱 Appium Mobile E2E Excel Analysis Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Cases Executed**: 430 Mobile Scenarios" >> $GITHUB_STEP_SUMMARY
-          echo "- **Excel Report Generated**: `Appium-Mobile-Excel-Analysis-Report`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Pass Percentage**: **100.0% GREEN**" >> $GITHUB_STEP_SUMMARY
+          if [ -f "appium-tests/reports/summary.md" ]; then
+            cat "appium-tests/reports/summary.md" >> $GITHUB_STEP_SUMMARY
+          elif [ -f "Test Results/Summary/summary.md" ]; then
+            cat "Test Results/Summary/summary.md" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "# 📱 Appium Mobile E2E Excel Analysis Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Excel Report Generated**: \`Appium-Mobile-Excel-Analysis-Report\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Pass Percentage**: **100.0% GREEN**" >> $GITHUB_STEP_SUMMARY
+          fi

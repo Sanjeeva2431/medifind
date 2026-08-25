@@ -40,10 +40,14 @@ async function runMasterAppiumSuite() {
         try {
             const suiteResults = await suite.runner(driver);
             allResults.push(...suiteResults);
+            for (const tc of suiteResults) {
+                const icon = tc.status === 'PASS' ? '✅' : '❌';
+                console.log(`   ${icon} [${tc.id}] ${tc.name} (${tc.durationMs}ms)`);
+            }
             const passed = suiteResults.filter(r => r.status === 'PASS').length;
-            console.log(`   ✅ ${suite.name} Finished: ${passed}/${suiteResults.length} Passed`);
+            console.log(`   📊 ${suite.name} Finished: ${passed}/${suiteResults.length} Passed\n`);
         } catch (err) {
-            console.log(`   ❌ Error executing ${suite.name}: ${err.message}`);
+            console.log(`   ❌ Error executing ${suite.name}: ${err.message}\n`);
         }
     }
 
@@ -62,10 +66,43 @@ async function runMasterAppiumSuite() {
     console.log(`📈  Pass Rate        : ${passRate}%`);
     console.log(`=======================================================\n`);
 
+    console.log(`📋 DETAILED EXECUTED TEST CASES:`);
+    allResults.forEach((tc, idx) => {
+        const icon = tc.status === 'PASS' ? '✅' : '❌';
+        console.log(`  ${idx + 1}. ${icon} [${tc.id}] ${tc.name} - ${tc.status}`);
+    });
+    console.log(`\n=======================================================\n`);
+
     console.log(`📊 Generating Excel Analysis Report...`);
     const reportInfo = await generateExcelReport(allResults, reportsDir);
+
+    try {
+        const fs = await import('fs');
+        const mdTable = allResults.map(tc => {
+            const icon = tc.status === 'PASS' ? 'PASS ✅' : 'FAIL ❌';
+            return `| \`${tc.id}\` | **${tc.name}** | ${tc.suite} | ${icon} | ${tc.durationMs}ms |`;
+        }).join('\n');
+
+        const mdSummary = `# 📱 Appium Mobile E2E Test Execution Summary
+
+**Total Scenarios:** ${allResults.length} | **Passed:** ${passedTotal} | **Failed:** ${failedTotal} | **Pass Rate:** ${passRate}% | **Duration:** ${overallDurationSec}s
+
+---
+
+### 📋 Detailed Test Cases Execution List
+
+| Test ID | Test Case Name | Test Suite | Status | Duration |
+| :--- | :--- | :--- | :---: | :---: |
+${mdTable}
+`;
+        fs.mkdirSync(reportsDir, { recursive: true });
+        fs.writeFileSync(path.join(reportsDir, 'summary.md'), mdSummary, 'utf8');
+    } catch (e) {
+        console.warn('[Markdown Summary Note]:', e);
+    }
+
     console.log(`=======================================================`);
-    console.log(`📁 EXCEL REPORT GENERATED SUCCESSFULLY`);
+    console.log(`📁 EXCEL & SUMMARY REPORTS GENERATED SUCCESSFULLY`);
     console.log(`=======================================================`);
     console.log(`📄 Appium Folder Report : ${reportInfo.latestFilePath}`);
     console.log(`📄 Timestamped Copy     : ${reportInfo.filePath}`);

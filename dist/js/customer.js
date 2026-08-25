@@ -38,8 +38,35 @@ export class CustomerModule {
         const isSearchingGoogle = googleMapsService.isSearchingGoogle;
         const googleApiError = googleMapsService.googleApiError;
 
+        // Evaluate dynamic 30-minute delivery time status for all orders
+        (this.app.state.orders || []).forEach(o => {
+            if (o && o.order_status !== 'Cancelled' && o.order_status !== 'Delivered') {
+                const elapsedMins = (Date.now() - new Date(o.created_at || Date.now()).getTime()) / 60000;
+                if (elapsedMins >= 30) {
+                    o.order_status = 'Delivered';
+                    o.tracking_step = 4;
+                    o.payment_status = 'Paid';
+                } else if (elapsedMins >= 15 && o.tracking_step < 3) {
+                    o.order_status = 'Out for Delivery';
+                    o.tracking_step = 3;
+                } else if (elapsedMins >= 5 && o.tracking_step < 2) {
+                    o.order_status = 'Preparing';
+                    o.tracking_step = 2;
+                }
+            }
+        });
+
+        const activeOrder = (this.app.state.orders || []).find(o => o.order_status !== 'Delivered' && o.order_status !== 'Cancelled');
+        let activeArrivalText = '';
+        if (activeOrder) {
+            const elapsedMins = Math.floor((Date.now() - new Date(activeOrder.created_at || Date.now()).getTime()) / 60000);
+            const remainingMins = Math.max(0, 30 - elapsedMins);
+            activeArrivalText = remainingMins > 0 ? `Estimated Arrival in ${remainingMins} mins` : `Delivered 🏠`;
+        }
+
         const cartCount = this.app.getCartCount();
-        const activeOrder = this.app.state.orders.find(o => o.order_status !== 'Delivered');
+
+        const serviceability = googleMapsService.isLocationServiceable(userLoc, 15.0);
 
         return `
             <!-- Top Navbar -->
@@ -53,75 +80,74 @@ export class CustomerModule {
                 </div>
 
                 <div class="location-selector" onclick="MediApp.openAddressModal()">
-                    <i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i>
-                    <span>${locState.status === 'detecting' ? '📍 Finding your location...' : userLoc.label}</span>
-                    <button class="btn-secondary" style="padding:2px 8px; font-size:10px; margin-left:4px;" onclick="event.stopPropagation(); MediApp.openAddressModal()">Change</button>
+                    <i class="fa-solid fa-location-dot" style="color:var(--primary);"></i>
+                    <div>
+                        <div class="location-address" style="font-weight:700;">${userLoc.label}</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-down" style="font-size:10px; opacity:0.6; margin-left:4px;"></i>
                 </div>
 
-                <div class="top-actions">
-                    <button class="icon-btn" onclick="MediApp.toggleTheme()" title="Toggle Dark/Light Mode">
-                        <i class="fa-solid ${this.app.state.darkMode ? 'fa-sun' : 'fa-moon'}"></i>
+                <div class="nav-actions">
+                    <button class="icon-btn" onclick="MediApp.openNotificationsModal()" title="Notifications">
+                        <i class="fa-solid fa-bell"></i>
                     </button>
-                    <button class="icon-btn" onclick="MediApp.setCustomerTab('cart')">
-                        <i class="fa-solid fa-bag-shopping"></i>
-                        ${cartCount > 0 ? `<span class="badge-count">${cartCount}</span>` : ''}
+                    <button class="icon-btn" onclick="MediApp.setCustomerTab('cart')" title="Cart" style="position:relative;">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                        ${cartCount > 0 ? `<span class="cart-badge">${cartCount}</span>` : ''}
                     </button>
                 </div>
             </header>
 
             <main class="main-content">
-                <!-- Location Status & Permission Banner -->
-                ${this.renderLocationStateBanner(locState, userLoc)}
-
-                <!-- Search Hero Banner -->
-                <section class="search-hero" style="margin-top:12px; margin-bottom:16px;">
-                    <h2 class="search-title">Fast 15-Minute Medicine Delivery ⚡</h2>
-                    <p class="search-subtitle">Order genuine medicines from verified nearby pharmacies at lowest prices</p>
-                    
-                    <div class="main-search-bar" onclick="MediApp.setCustomerTab('search')">
-                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" placeholder="Search 'Dolo 650', 'Paracetamol', or generic name..." readonly>
-                        <button class="voice-btn" onclick="event.stopPropagation(); MediApp.openVoiceSearchModal()" title="Voice Search">
-                            <i class="fa-solid fa-microphone"></i>
+                ${!serviceability.serviceable ? `
+                    <!-- Serviceability Restriction Alert Banner -->
+                    <div style="background:var(--emergency-light); border:1px solid var(--emergency-red); border-radius:var(--radius-lg); padding:14px 18px; margin-bottom:20px; color:var(--emergency-red); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:var(--shadow-sm);">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <i class="fa-solid fa-circle-exclamation" style="font-size:22px;"></i>
+                            <div>
+                                <div style="font-weight:800; font-size:14px;">The location is currently not serviceable</div>
+                                <div style="font-size:11px; font-weight:600; opacity:0.9;">Delivery is available only within a 15 km radius of our medicine supply store.</div>
+                            </div>
+                        </div>
+                        <button class="btn-secondary" style="font-size:11px; padding:6px 12px; border-color:var(--emergency-red); color:var(--emergency-red);" onclick="MediApp.detectLiveLocation()">
+                            <i class="fa-solid fa-location-crosshairs"></i> Change Location
                         </button>
                     </div>
-                </section>
-
-                <!-- Quick Mobile Action Grid (Primary Mobile Actions) -->
-                <div class="quick-action-grid" style="grid-template-columns: repeat(3, 1fr);">
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('search')">
-                        <div class="quick-action-icon" style="background:var(--primary-light); color:var(--primary);">
-                            <i class="fa-solid fa-pills"></i>
-                        </div>
-                        <span class="quick-action-title">Search Medicine</span>
-                    </div>
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('pharmacies')">
-                        <div class="quick-action-icon" style="background:var(--warning-light); color:var(--warning-amber);">
-                            <i class="fa-solid fa-store"></i>
-                        </div>
-                        <span class="quick-action-title">Pharmacies</span>
-                    </div>
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('emergency')">
-                        <div class="quick-action-icon" style="background:var(--emergency-light); color:var(--emergency-red);">
-                            <i class="fa-solid fa-truck-medical"></i>
-                        </div>
-                        <span class="quick-action-title">Emergency</span>
-                    </div>
-                </div>
-
+                ` : ''}
                 ${activeOrder ? `
                     <!-- Active Live Order Banner -->
                     <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color:white; border-radius:var(--radius-lg); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; box-shadow:var(--shadow-md);">
                         <div>
-                            <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">ACTIVE LIVE ORDER</div>
+                            <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">ACTIVE LIVE ORDER (30-MIN DELIVERY)</div>
                             <div style="font-size:16px; font-weight:800;">${activeOrder.id} - ${activeOrder.order_status}</div>
-                            <div style="font-size:12px; opacity:0.9;">Estimated Arrival in 12 mins • Driver: ${activeOrder.delivery_partner.name}</div>
+                            <div style="font-size:12px; opacity:0.9;">${activeArrivalText} • Driver: ${activeOrder.delivery_partner?.name || 'Rohan Verma'}</div>
                         </div>
                         <button class="emergency-btn" onclick="MediApp.openTrackingModal('${activeOrder.id}')">
                             <i class="fa-solid fa-map-location-dot"></i> Live Track
                         </button>
                     </div>
                 ` : ''}
+
+                <!-- Medical Store Finder Banner (Google Maps Integration) -->
+                <section style="margin-bottom: 24px;">
+                    <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color:white; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-md); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+                        <div style="flex:1; min-width:240px;">
+                            <div style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#e0f2fe; margin-bottom:4px;">
+                                <i class="fa-solid fa-map-location-dot"></i> REAL-TIME GOOGLE MAPS RADAR
+                            </div>
+                            <h3 style="font-size:20px; font-weight:800; margin-bottom:6px;">Medical Store Finder</h3>
+                            <p style="font-size:13px; opacity:0.95; line-height:1.4;">Discover all verified medical stores and chemists nearby your current location in real-time with Google Maps navigation.</p>
+                            <div style="font-size:12px; font-weight:700; margin-top:8px; background:rgba(255,255,255,0.2); display:inline-block; padding:4px 12px; border-radius:20px;">
+                                📍 ${userLoc.label}
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center;">
+                            <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="add-cart-btn" style="background:white; color:#0284c7; font-weight:800; text-decoration:none; padding:12px 20px; font-size:14px; box-shadow:var(--shadow-sm); white-space:nowrap;">
+                                <i class="fa-brands fa-google"></i> Open in Google Maps
+                            </a>
+                        </div>
+                    </div>
+                </section>
 
                 <!-- Categories -->
                 <section style="margin-bottom: 24px;">
@@ -139,63 +165,6 @@ export class CustomerModule {
                     </div>
                 </section>
 
-                <!-- Nearby Pharmacies Horizontal Carousel (Google Places API) -->
-                <section style="margin-bottom: 24px;">
-                    <div class="section-header">
-                        <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Pharmacies</h3>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
-                                <i class="fa-solid fa-arrows-rotate"></i> Refresh Nearby Pharmacies
-                            </button>
-                            <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${pharmacies.length})</span>
-                        </div>
-                    </div>
-
-                    ${isSearchingGoogle ? `
-                        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px;">
-                            ${[1, 2, 3].map(() => `
-                                <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); opacity:0.7;">
-                                    <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">🔎 Finding nearby pharmacies...</div>
-                                    <div style="height:14px; background:var(--card-border); border-radius:4px; margin-bottom:6px; width:80%;"></div>
-                                    <div style="height:10px; background:var(--card-border); border-radius:4px; width:60%;"></div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : `
-                        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
-                            ${pharmacies.slice(0, 8).map(p => `
-                                <div style="flex:0 0 270px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); cursor:pointer; display:flex; flex-direction:column; justify-content:space-between;"
-                                     onclick="MediApp.viewPharmacyDetails('${p.id}')">
-                                    <div>
-                                        <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
-                                            <img src="${p.logo}" style="width:48px; height:48px; border-radius:var(--radius-sm); object-fit:cover;">
-                                            <div style="flex:1;">
-                                                <div style="font-weight:700; font-size:14px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.shop_name}</div>
-                                                <div style="font-size:11px; color:var(--text-muted);">${p.address ? p.address.split(',').slice(0, 2).join(',') : ''}</div>
-                                            </div>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:8px;">
-                                            <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;">
-                                                ⭐ ${p.rating} ${p.reviews_count ? `(${p.reviews_count})` : ''}
-                                            </span>
-                                            <span style="font-weight:800; color:${p.status === 'open' ? 'var(--secondary)' : 'var(--emergency-red)'};">
-                                                ${p.status === 'open' ? '🟢 Open' : '🔴 Closed'}
-                                            </span>
-                                        </div>
-                                        <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">
-                                            📍 ${p.distance} away • ⚡ ${p.delivery_time}
-                                        </div>
-                                    </div>
-
-                                    <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="text-decoration:none; text-align:center; justify-content:center; padding:6px 10px; font-size:11px;" onclick="event.stopPropagation();">
-                                        <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
-                                    </a>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `}
-                </section>
-
                 <!-- Popular Medicines Grid -->
                 <section>
                     <div class="section-header">
@@ -203,13 +172,12 @@ export class CustomerModule {
                         <span class="see-all-link" onclick="MediApp.setCustomerTab('search')">Browse All</span>
                     </div>
                     <div class="cards-grid">
-                        ${this.renderMedicineCards(MOCK_MEDICINES.slice(0, 8))}
+                        ${this.renderMedicineCards((this.app.state.medicines || []).slice(0, 8))}
                     </div>
                 </section>
             </main>
 
             ${this.renderBottomNav()}
-            ${this.renderAiFab()}
         `;
     }
 
@@ -295,70 +263,102 @@ export class CustomerModule {
         const userLoc = googleMapsService.getUserLocation();
         const pharmacies = googleMapsService.getPharmacies();
         const isSearchingGoogle = googleMapsService.isSearchingGoogle;
-        const googleApiError = googleMapsService.googleApiError;
 
         const query = (this.pharmacySearchQuery || '').toLowerCase();
         const filteredPharmacies = pharmacies.filter(p => 
-            !query || p.shop_name.toLowerCase().includes(query) || p.address.toLowerCase().includes(query)
+            !query || (p.shop_name || '').toLowerCase().includes(query) || (p.address || '').toLowerCase().includes(query)
         );
 
         return `
             <header class="navbar-top">
                 <button class="icon-btn" onclick="MediApp.setCustomerTab('home')"><i class="fa-solid fa-arrow-left"></i></button>
-                <h2 style="font-size:18px; flex:1;">Pharmacies Near You (${filteredPharmacies.length})</h2>
-                <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
-                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
-                </button>
+                <h2 style="font-size:18px; flex:1;">Medical Store Finder (${filteredPharmacies.length})</h2>
+                <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="add-cart-btn" style="font-size:11px; padding:6px 10px; text-decoration:none; white-space:nowrap;">
+                    <i class="fa-brands fa-google"></i> Open in Google Maps
+                </a>
             </header>
 
             <main class="main-content">
-                <!-- Interactive Real-Time Google Maps Container -->
-                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:12px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Interactive Google Map • ${userLoc.label}</span>
-                        <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Refresh GPS</button>
+                <!-- User Live Location Status Banner -->
+                <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; box-shadow:var(--shadow-sm); flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; font-weight:800; color:#38bdf8;">YOUR CURRENT LOCATION</div>
+                        <div style="font-size:14px; font-weight:800; margin-top:2px;">📍 ${userLoc.label}</div>
+                        <div style="font-size:11px; opacity:0.8; margin-top:2px;">Showing medical stores strictly relative to your GPS coordinates</div>
                     </div>
-                    <div id="nearbyPharmaciesMapCanvas" style="height:220px; width:100%; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);"></div>
+                    <button class="add-cart-btn" style="background:var(--primary); color:white; padding:8px 14px; font-size:12px; font-weight:800;" onclick="MediApp.detectLiveLocation()">
+                        <i class="fa-solid fa-location-crosshairs"></i> Use My Live Location
+                    </button>
                 </div>
 
-                <div style="margin-bottom:16px;">
-                    <div class="main-search-bar" style="margin:0;">
-                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" placeholder="Search pharmacies by name or location..." value="${this.pharmacySearchQuery || ''}" oninput="MediApp.filterPharmacies(this.value)">
+                <!-- Interactive Real-Time Map Container -->
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:12px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Google Maps Radar • ${userLoc.label}</span>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Refresh GPS</button>
+                            <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="btn-secondary" style="font-size:11px; padding:3px 8px; text-decoration:none; color:var(--primary); font-weight:700;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Maps</a>
+                        </div>
                     </div>
+                    <div id="nearbyPharmaciesMapCanvas" style="height:230px; width:100%; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);"></div>
                 </div>
 
                 ${isSearchingGoogle ? `
                     <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
                         <i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--primary); margin-bottom:12px;"></i>
-                        <h3>🔎 Finding nearby pharmacies...</h3>
+                        <h3>🔎 Scanning nearby medical stores around your location...</h3>
                     </div>
                 ` : `
                     <div style="display:flex; flex-direction:column; gap:14px;">
-                        ${filteredPharmacies.map(p => {
+                        ${filteredPharmacies.length === 0 ? `
+                            <div style="text-align:center; padding:36px 20px; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); box-shadow:var(--shadow-md);">
+                                <i class="fa-solid fa-map-location-dot" style="font-size:44px; color:#38bdf8; margin-bottom:12px;"></i>
+                                <h3 style="font-size:20px; font-weight:800; margin-bottom:6px;">Find Medical Stores Near You on Google Maps</h3>
+                                <p style="font-size:13px; opacity:0.9; margin-bottom:18px; max-width:440px; margin-left:auto; margin-right:auto; line-height:1.4;">
+                                    View all open chemists, drugstores, and medical shops around your location (📍 ${userLoc.label}) with live Google Maps directions and contact info.
+                                </p>
+                                <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                                    <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="add-cart-btn" style="background:#0ea5e9; color:white; font-weight:800; padding:12px 22px; font-size:13px; text-decoration:none; justify-content:center;">
+                                        <i class="fa-brands fa-google"></i> Open Google Maps Finder
+                                    </a>
+                                    <button class="btn-secondary" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:700; padding:12px 18px; font-size:13px;" onclick="MediApp.detectLiveLocation()">
+                                        <i class="fa-solid fa-location-crosshairs"></i> Refresh GPS
+                                    </button>
+                                </div>
+                            </div>
+                        ` : filteredPharmacies.map(p => {
                             const isFav = (this.app.state.favoritePharmacies || []).includes(p.id);
                             return `
-                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; gap:14px; align-items:center; box-shadow:var(--shadow-sm); cursor:pointer;"
+                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow-sm); cursor:pointer;"
                                      onclick="MediApp.viewPharmacyDetails('${p.id}')">
-                                    <img src="${p.logo}" style="width:64px; height:64px; border-radius:var(--radius-md); object-fit:cover;">
-                                    <div style="flex:1;">
-                                        <div style="font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:space-between;">
-                                            <span>${p.shop_name} <i class="fa-solid fa-circle-check" style="color:var(--primary); font-size:14px;" title="Verified License"></i></span>
-                                            <button class="icon-btn" style="padding:4px; color:${isFav ? 'var(--emergency-red)' : 'var(--text-muted)'};" onclick="event.stopPropagation(); MediApp.toggleFavoritePharmacy('${p.id}')">
-                                                <i class="fa-${isFav ? 'solid' : 'regular'} fa-heart"></i>
-                                            </button>
+                                    <div style="display:flex; gap:14px; align-items:flex-start;">
+                                        <img src="${p.logo}" style="width:64px; height:64px; border-radius:var(--radius-md); object-fit:cover;">
+                                        <div style="flex:1;">
+                                            <div style="font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                                                <span>${p.shop_name} <i class="fa-solid fa-circle-check" style="color:var(--primary); font-size:14px;" title="Verified Pharmacy License"></i></span>
+                                                <button class="icon-btn" style="padding:4px; color:${isFav ? 'var(--emergency-red)' : 'var(--text-muted)'};" onclick="event.stopPropagation(); MediApp.toggleFavoritePharmacy('${p.id}')">
+                                                    <i class="fa-${isFav ? 'solid' : 'regular'} fa-heart"></i>
+                                                </button>
+                                            </div>
+                                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;"><i class="fa-solid fa-location-dot" style="color:var(--primary);"></i> ${p.address}</div>
+                                            <div style="display:flex; gap:8px; font-size:12px; align-items:center; flex-wrap:wrap;">
+                                                <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 8px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating || 4.7} ${p.reviews_count ? `(${p.reviews_count})` : ''}</span>
+                                                <span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-route"></i> ${p.distance || '0.8 km'} away</span>
+                                                <span style="background:var(--secondary-light); color:var(--secondary); padding:2px 8px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-bolt"></i> ${p.delivery_time || '15-20 mins'}</span>
+                                                <span style="font-weight:800; color:${p.status === 'open' ? 'var(--secondary)' : 'var(--emergency-red)'};">${p.status === 'open' ? '🟢 Open Now' : '🔴 Closed'}</span>
+                                            </div>
                                         </div>
-                                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
-                                        <div style="display:flex; gap:10px; font-size:12px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
-                                            <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating} ${p.reviews_count ? `(${p.reviews_count})` : ''}</span>
-                                            <span style="font-weight:700; color:var(--primary);">📍 ${p.distance} away</span>
-                                            <span style="font-weight:800; color:${p.status === 'open' ? 'var(--secondary)' : 'var(--emergency-red)'};">${p.status === 'open' ? '🟢 Open' : '🔴 Closed'}</span>
-                                        </div>
-                                        ${p.phone ? `<div style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-phone"></i> ${p.phone}</div>` : ''}
                                     </div>
-                                    <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="text-decoration:none; padding:8px 12px; font-size:12px;" onclick="event.stopPropagation();">
-                                        <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
-                                    </a>
+                                    <div style="display:flex; gap:10px; border-top:1px solid var(--card-border); padding-top:10px;">
+                                        ${p.phone ? `
+                                            <a href="tel:${p.phone}" class="btn-secondary" style="flex:1; text-align:center; text-decoration:none; padding:8px; font-size:12px; font-weight:700;" onclick="event.stopPropagation();">
+                                                <i class="fa-solid fa-phone"></i> Call Store
+                                            </a>
+                                        ` : ''}
+                                        <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="flex:1; text-align:center; text-decoration:none; padding:8px; font-size:12px; justify-content:center;" onclick="event.stopPropagation();">
+                                            <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+                                        </a>
+                                    </div>
                                 </div>
                             `;
                         }).join('')}
@@ -375,7 +375,7 @@ export class CustomerModule {
         const p = pharmacies.find(item => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES.find(item => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES[0];
         
         // Match inventory from MediFind database
-        const pMedicines = MOCK_MEDICINES.filter(m => m.pharmacy_id === p.id);
+        const pMedicines = (this.app.state.medicines || []).filter(m => m.pharmacy_id === p.id);
         const hasMediFindInventory = pMedicines.length > 0;
 
         return `
@@ -390,8 +390,7 @@ export class CustomerModule {
                         <img src="${p.logo}" style="width:72px; height:72px; border-radius:var(--radius-md); object-fit:cover;">
                         <div>
                             <h2 style="font-size:20px;">${p.shop_name}</h2>
-                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
-                            <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px;">📍 ${p.distance} away • ⭐ ${p.rating} rating</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px;">⭐ ${p.rating} rating</div>
                             ${p.license_number ? `<div style="font-size:11px; color:var(--text-muted);">Drug License: <code>${p.license_number}</code></div>` : ''}
                         </div>
                     </div>
@@ -439,8 +438,8 @@ export class CustomerModule {
 
             <main class="main-content">
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:20px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                    <div style="height:220px; width:100%; border-radius:var(--radius-md); overflow:hidden; background:#f1f5f9; margin-bottom:16px; position:relative;">
-                        <img src="${med.image}" style="width:100%; height:100%; object-fit:cover;">
+                    <div style="height:100px; width:100%; border-radius:var(--radius-md); background:linear-gradient(135deg, var(--primary-light) 0%, #e0f2fe 100%); color:var(--primary); display:flex; align-items:center; justify-content:center; margin-bottom:16px; position:relative;">
+                        <i class="fa-solid fa-pills" style="font-size:44px;"></i>
                         ${med.requires_prescription ? `<span class="rx-badge">Rx PRESCRIPTION REQUIRED</span>` : ''}
                     </div>
 
@@ -568,10 +567,22 @@ export class CustomerModule {
 
     // 6. Cart & Checkout Page (/cart)
     renderCartPage() {
+        // Always sync cart item prices with live admin-configured prices
+        (this.app.state.cart || []).forEach(item => {
+            const liveMed = (this.app.state.medicines || []).find(m => m.id === item.id);
+            if (liveMed && liveMed.price !== undefined) {
+                item.price = liveMed.price;
+            }
+        });
+
+        const userLoc = googleMapsService.getUserLocation();
+        const serviceability = googleMapsService.isLocationServiceable(userLoc, 15.0);
+
         const subtotal = this.app.state.cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-        const deliveryFee = subtotal > 0 ? (subtotal > 200 ? 0 : 25) : 0;
+        const distKm = serviceability.distanceKm || 0;
+        const deliveryFee = subtotal > 0 ? parseFloat((distKm * 10).toFixed(2)) : 0;
         const discount = this.app.state.appliedCoupon ? (subtotal * 0.2) : 0;
-        const tax = subtotal * 0.05;
+        const tax = parseFloat((subtotal * 0.05).toFixed(2));
         const total = Math.max(0, subtotal + deliveryFee + tax - discount);
 
         return `
@@ -611,35 +622,57 @@ export class CustomerModule {
                             `).join('')}
                         </div>
 
-                        <!-- Delivery Address Input -->
+                        <!-- Delivery Address Input & Picker Actions -->
                         <div style="margin-bottom:16px;">
-                            <label style="font-size:12px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">DELIVERY ADDRESS</label>
-                            <input type="text" id="deliveryAddressInput" value="${(() => {
-                                const u = this.app.authService.getUser();
-                                if (!u || !u.address) return googleMapsService.getUserLocation().label;
-                                return typeof u.address === 'string' ? u.address : `${u.address.street || ''}, ${u.address.city || ''}`;
-                            })()}" 
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <label style="font-size:12px; font-weight:700; color:var(--text-muted);">DELIVERY ADDRESS (MAX 15 KM RADIUS)</label>
+                                <div style="display:flex; gap:6px;">
+                                    <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Use GPS</button>
+                                    <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.openMapPickerModal()"><i class="fa-solid fa-map-pin"></i> Select Map</button>
+                                </div>
+                            </div>
+                            <input type="text" id="deliveryAddressInput" value="${googleMapsService.getUserLocation().label}" 
+                                   oninput="MediApp.validateCheckoutAddress(this.value)"
+                                   onchange="MediApp.validateCheckoutAddress(this.value)"
+                                   placeholder="Type delivery address or select on map..."
                                    style="width:100%; border:1px solid var(--card-border); padding:10px 14px; border-radius:var(--radius-md); font-size:13px;">
+                        </div>
+
+                        <!-- Dynamic Serviceability Alert Box -->
+                        <div id="checkoutServiceabilityAlert" style="background:var(--emergency-light); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:14px; margin-bottom:16px; color:var(--emergency-red); font-weight:800; font-size:13px; display:${!serviceability.serviceable ? 'flex' : 'none'}; align-items:center; gap:10px;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size:20px;"></i>
+                            <div>
+                                <div style="font-size:14px; font-weight:800;">The location is currently not serviceable</div>
+                                <div style="font-size:11px; font-weight:600; opacity:0.9; margin-top:2px;">Delivery is available only within a 15 km radius of our medicine supply store.</div>
+                            </div>
                         </div>
 
                         <!-- Bill Summary -->
                         <div style="background:var(--background); padding:14px; border-radius:var(--radius-md); font-size:13px; margin-bottom:20px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Subtotal</span><span>₹${subtotal.toFixed(2)}</span>
+                                <span>Subtotal</span><span id="cartSubtotalText">₹${subtotal.toFixed(2)}</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Delivery Charge</span><span>${deliveryFee === 0 ? '<span style="color:var(--secondary); font-weight:700;">FREE</span>' : '₹' + deliveryFee}</span>
+                                <span>Distance to Store</span><span id="cartDistanceText">${distKm.toFixed(1)} km</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Taxes (GST 5%)</span><span>₹${tax.toFixed(2)}</span>
+                                <span>Delivery Charge (₹10/km)</span><span id="cartDeliveryFeeText">₹${deliveryFee.toFixed(2)}</span>
                             </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Taxes (GST 5% on items)</span><span id="cartTaxText">₹${tax.toFixed(2)}</span>
+                            </div>
+                            ${discount > 0 ? `
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--secondary);">
+                                    <span>Coupon Discount (20%)</span><span>-₹${discount.toFixed(2)}</span>
+                                </div>
+                            ` : ''}
                             <div style="border-top:1px dashed var(--card-border); margin-top:8px; padding-top:8px; display:flex; justify-content:space-between; font-weight:800; font-size:16px;">
-                                <span>Total Amount</span><span style="color:var(--primary);">₹${total.toFixed(2)}</span>
+                                <span>Total Amount</span><span id="cartTotalText" style="color:var(--primary);">₹${total.toFixed(2)}</span>
                             </div>
                         </div>
 
-                        <button class="add-cart-btn" style="width:100%; justify-content:center; padding:14px; font-size:16px;" onclick="MediApp.simulateRazorpayCheckout(${total})">
-                            <i class="fa-solid fa-lock"></i> Place Order • ₹${total.toFixed(2)}
+                        <button id="placeOrderBtn" data-total="${total.toFixed(2)}" class="add-cart-btn" ${!serviceability.serviceable ? 'disabled style="width:100%; justify-content:center; padding:14px; font-size:15px; opacity:0.5; cursor:not-allowed; background:var(--text-muted); border-color:var(--text-muted);"' : 'style="width:100%; justify-content:center; padding:14px; font-size:16px;"'} onclick="MediApp.simulateRazorpayCheckout(${total})">
+                            ${!serviceability.serviceable ? '<i class="fa-solid fa-ban"></i> The location is currently not serviceable' : `<i class="fa-solid fa-lock"></i> Place Order • ₹${total.toFixed(2)}`}
                         </button>
                     </div>
                 `}
@@ -660,8 +693,8 @@ export class CustomerModule {
             return `
                 <div class="med-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative;">
                     <div>
-                        <div class="med-img-wrapper" onclick="MediApp.viewMedicineDetails('${med.id}')">
-                            <img src="${med.image}" alt="${med.name}">
+                        <div class="med-img-wrapper" onclick="MediApp.viewMedicineDetails('${med.id}')" style="display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--primary-light) 0%, #e0f2fe 100%); color:var(--primary); position:relative; min-height:90px; border-radius:var(--radius-md); margin-bottom:10px;">
+                            <i class="fa-solid fa-pills" style="font-size:36px;"></i>
                             ${med.requires_prescription ? `<span class="rx-badge">Rx REQUIRED</span>` : ''}
                             <span class="discount-tag">15% OFF</span>
                         </div>
@@ -684,24 +717,7 @@ export class CustomerModule {
                             ${isGoogleDiscovered ? '⚠️ Medicine availability not available' : (inStock ? `📦 In Stock (${med.stock} units)` : '📦 Out of Stock')}
                         </div>
 
-                        <!-- 6. Pharmacy, 7. Distance, 8. Open/Closed, 9. Rating, 10. Delivery -->
-                        <div style="background:var(--background); padding:8px 10px; border-radius:var(--radius-sm); font-size:11px; margin-bottom:10px; display:flex; flex-direction:column; gap:3px;">
-                            <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text-main);">
-                                <span><i class="fa-solid fa-store" style="color:var(--primary);"></i> ${med.pharmacy_name}</span>
-                                <span>📍 ${med.pharmacy_distance}</span>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="color:${isOpen ? 'var(--secondary)' : 'var(--emergency-red)'}; font-weight:800;">
-                                    ● ${isOpen ? 'OPEN NOW' : 'CLOSED'}
-                                </span>
-                                <span style="background:var(--warning-light); color:var(--warning-amber); padding:1px 5px; border-radius:3px; font-weight:800;">
-                                    ⭐ ${med.pharmacy_rating}
-                                </span>
-                            </div>
-                            <div style="color:var(--primary); font-weight:700; margin-top:2px;">
-                                ⚡ ${med.pharmacy_delivery_available ? `Delivery Available (${med.delivery_time})` : 'Pickup Only'}
-                            </div>
-                        </div>
+
                     </div>
 
                     <!-- 3. Price & Action -->
@@ -743,17 +759,11 @@ export class CustomerModule {
     }
 
     renderAiFab() {
-        return `
-            <button class="ai-fab" onclick="MediApp.openAiDrawer()">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <span>Ask MediAI</span>
-            </button>
-        `;
+        return '';
     }
 
     renderSearchPage() {
-        const dbMeds = Array.from(firestoreDb.collections.Medicines.values());
-        const allMedicines = dbMeds.length > 0 ? dbMeds : this.app.state.medicines;
+        const allMedicines = this.app.state.medicines || [];
         const pharmacies = googleMapsService.getPharmacies();
 
         this.searchEngine.setDatasets(allMedicines, pharmacies);
@@ -812,59 +822,175 @@ export class CustomerModule {
         let userOrders = [];
 
         if (currentUser) {
-            userOrders = this.app.state.orders.filter(o => 
-                o.user_id === currentUser.id || 
-                o.customer_id === currentUser.id || 
-                (o.customer_email && o.customer_email.toLowerCase() === currentUser.email.toLowerCase())
-            );
+            const userEmail = (currentUser.email || '').toLowerCase();
+            const userName = (currentUser.name || '').toLowerCase();
+            const userId = String(currentUser.id || '');
+
+            const filtered = (this.app.state.orders || []).filter(o => {
+                if (!o) return false;
+                const oUserId = String(o.user_id || '');
+                const oCustId = String(o.customer_id || '');
+                const oEmail = (o.customer_email || '').toLowerCase();
+                const oName = (o.customer_name || '').toLowerCase();
+
+                return (
+                    (userId && (oUserId === userId || oCustId === userId)) ||
+                    (userEmail && oEmail && oEmail === userEmail) ||
+                    (userName && oName && oName === userName) ||
+                    oUserId.startsWith('usr_guest_')
+                );
+            });
+
+            userOrders = (filtered.length > 0) ? filtered : (this.app.state.orders || []);
         } else {
-            userOrders = this.app.state.orders.filter(o => o.user_id && o.user_id.startsWith('usr_guest_'));
+            userOrders = this.app.state.orders || [];
         }
+
+        const activeOrders = userOrders.filter(o => o.order_status !== 'Delivered' && o.order_status !== 'Cancelled');
+        const deliveredOrders = userOrders.filter(o => o.order_status === 'Delivered' || o.order_status === 'Cancelled');
+        const totalSpent = userOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+        const renderSingleOrderCard = (o, isActive) => {
+            const isCompleted = o.order_status === 'Delivered';
+            const isCancelled = o.order_status === 'Cancelled';
+            const items = o.items || [];
+            const itemsSum = items.reduce((sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 1), 0);
+            const deliveryFee = o.delivery_fee !== undefined ? o.delivery_fee : (itemsSum > 0 ? (itemsSum > 200 ? 0 : 25) : 0);
+            const tax = o.tax !== undefined ? o.tax : parseFloat((itemsSum * 0.05).toFixed(2));
+            const discount = o.discount || 0;
+            const computedTotal = parseFloat(Math.max(0, itemsSum + deliveryFee + tax - discount).toFixed(2));
+
+            const total = (o.total_amount && items.length > 0 && Math.abs(o.total_amount - computedTotal) < 0.05) ? o.total_amount : computedTotal;
+            o.total_amount = total;
+            o.subtotal = itemsSum;
+            o.tax = tax;
+            o.delivery_fee = deliveryFee;
+            const formattedDate = o.created_at ? new Date(o.created_at).toLocaleString() : new Date().toLocaleString();
+
+            return `
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:18px; box-shadow:var(--shadow-sm); margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid var(--card-border); padding-bottom:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-weight:800; color:var(--primary); font-size:16px;">${o.id}</span>
+                                <span style="font-size:11px; background:var(--background); padding:2px 6px; border-radius:var(--radius-sm); border:1px solid var(--card-border); color:var(--text-muted); font-weight:600;">${o.payment_method || 'UPI'}</span>
+                            </div>
+                            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;"><i class="fa-regular fa-clock"></i> ${formattedDate}</div>
+                        </div>
+                        <span class="role-badge-btn" style="background:${isCancelled ? 'var(--emergency-light)' : isCompleted ? 'var(--secondary-light)' : 'var(--primary-light)'}; color:${isCancelled ? 'var(--emergency-red)' : isCompleted ? 'var(--secondary)' : 'var(--primary)'}; font-weight:700;">
+                            ${isActive ? '<i class="fa-solid fa-circle-dot fa-spin" style="margin-right:4px;"></i>' : ''}${o.order_status}
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; margin-bottom:14px; background:var(--background); padding:12px; border-radius:var(--radius-md); border:1px solid var(--card-border);">
+                        <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">ORDER ITEMS (${items.length})</div>
+                        ${items.map(it => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:13px;">
+                                <span>• <b>${it.quantity || 1}x</b> ${it.name}</span>
+                                <span style="font-weight:600;">₹${((it.price || 0) * (it.quantity || 1)).toFixed(2)}</span>
+                            </div>
+                        `).join('')}
+                        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--card-border); display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:12px; color:var(--text-muted);">Payment: <b>${o.payment_status || 'Paid'}</b></span>
+                            <span style="font-size:15px; font-weight:800; color:var(--text-main);">Total: ₹${total.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                        ${isActive ? `
+                            <button class="add-cart-btn" style="font-size:12px; padding:6px 14px;" onclick="MediApp.openTrackingModal('${o.id}')">
+                                <i class="fa-solid fa-map-location-dot"></i> Track Live Delivery
+                            </button>
+                            <button class="btn-secondary" style="color:var(--emergency-red); font-size:12px; padding:6px 12px;" onclick="MediApp.cancelOrder('${o.id}')">
+                                <i class="fa-solid fa-ban"></i> Cancel Order
+                            </button>
+                        ` : `
+                            <button class="btn-secondary" style="font-size:12px; padding:6px 12px;" onclick="MediApp.openGstInvoiceModal('${o.id}')">
+                                <i class="fa-solid fa-file-invoice"></i> GST Invoice
+                            </button>
+                            <button class="add-cart-btn" style="background:var(--secondary); font-size:12px; padding:6px 14px;" onclick="MediApp.reorder('${o.id}')">
+                                <i class="fa-solid fa-rotate-right"></i> Reorder Items
+                            </button>
+                        `}
+                    </div>
+                </div>
+            `;
+        };
 
         return `
             <header class="navbar-top">
-                <h2 style="font-size:18px; flex:1;">My Orders History</h2>
+                <h2 style="font-size:18px; flex:1;"><i class="fa-solid fa-box-archive" style="color:var(--primary);"></i> Orders & History</h2>
+                <button class="icon-btn" onclick="MediApp.loadSavedOrders(); MediApp.render();" title="Refresh Orders"><i class="fa-solid fa-rotate-right"></i></button>
                 <button class="icon-btn" onclick="MediApp.openNotificationsModal()" title="Notifications"><i class="fa-solid fa-bell"></i></button>
             </header>
 
             <main class="main-content">
+                <!-- Summary Metrics Bar -->
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:20px;">
+                    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:12px; text-align:center;">
+                        <div style="font-size:18px; font-weight:800; color:var(--primary);">${userOrders.length}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-weight:600;">Total Orders</div>
+                    </div>
+                    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:12px; text-align:center;">
+                        <div style="font-size:18px; font-weight:800; color:var(--secondary);">${activeOrders.length}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-weight:600;">Active Live</div>
+                    </div>
+                    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:12px; text-align:center;">
+                        <div style="font-size:18px; font-weight:800; color:var(--warning-amber);">₹${totalSpent.toFixed(0)}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-weight:600;">Total Spent</div>
+                    </div>
+                </div>
+
                 ${userOrders.length === 0 ? `
-                    <div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
+                    <div style="text-align:center; padding:60px 20px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg);">
                         <i class="fa-solid fa-box-open" style="font-size:48px; color:var(--text-muted); margin-bottom:12px;"></i>
                         <h3 style="font-size:16px; margin-bottom:4px; color:var(--text-main);">No Orders Placed Yet</h3>
-                        <p style="font-size:12px;">Your order history will appear here once you place your first medicine order.</p>
+                        <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Your order history will appear here automatically once you place your first medicine order.</p>
+                        <button class="add-cart-btn" style="margin:0 auto; padding:10px 20px; font-size:14px;" onclick="MediApp.setCustomerTab('home')">
+                            <i class="fa-solid fa-pills"></i> Browse Medicines & Order
+                        </button>
                     </div>
-                ` : userOrders.map(o => {
-                    const isCompleted = o.order_status === 'Delivered';
-                    const isCancelled = o.order_status === 'Cancelled';
-                    const isActive = !isCompleted && !isCancelled;
-
-                    return `
-                        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px; box-shadow:var(--shadow-sm);">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                <div>
-                                    <span style="font-weight:800; color:var(--primary); font-size:16px;">${o.id}</span>
-                                    <div style="font-size:11px; color:var(--text-muted);">${new Date(o.created_at || Date.now()).toLocaleDateString()}</div>
-                                </div>
-                                <span class="role-badge-btn" style="background:${isCancelled ? 'var(--emergency-light)' : isCompleted ? 'var(--secondary-light)' : 'var(--primary-light)'}; color:${isCancelled ? 'var(--emergency-red)' : isCompleted ? 'var(--secondary)' : 'var(--primary)'};">${o.order_status}</span>
-                            </div>
-
-                            <div style="font-size:13px; margin-bottom:12px; background:var(--background); padding:10px; border-radius:var(--radius-sm);">
-                                ${o.items.map(it => `<div>• <b>${it.quantity}x ${it.name}</b> — ₹${(it.price * it.quantity).toFixed(2)}</div>`).join('')}
-                                <div style="margin-top:6px; font-weight:800; text-align:right; color:var(--text-main);">Total: ₹${o.total_amount.toFixed(2)}</div>
-                            </div>
-
-                            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                                ${isActive ? `
-                                    <button class="add-cart-btn" onclick="MediApp.openTrackingModal('${o.id}')"><i class="fa-solid fa-map-location-dot"></i> Live Track</button>
-                                    <button class="btn-secondary" style="color:var(--emergency-red);" onclick="MediApp.cancelOrder('${o.id}')"><i class="fa-solid fa-ban"></i> Cancel Order</button>
-                                ` : `
-                                    <button class="add-cart-btn" style="background:var(--secondary);" onclick="MediApp.reorder('${o.id}')"><i class="fa-solid fa-rotate-right"></i> Reorder Items</button>
-                                `}
-                            </div>
+                ` : `
+                    <!-- SECTION 1: Active Live Orders (Not Delivered) -->
+                    <div style="margin-bottom:28px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px; color:var(--primary);">
+                                <i class="fa-solid fa-truck-fast"></i> Active Orders (${activeOrders.length})
+                            </h3>
+                            <span style="font-size:11px; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full); font-weight:700;">
+                                In-Progress & Live Delivery
+                            </span>
                         </div>
-                    `;
-                }).join('')}
+
+                        ${activeOrders.length === 0 ? `
+                            <div style="padding:20px; background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-md); text-align:center; color:var(--text-muted); font-size:13px;">
+                                No active undelivered orders right now.
+                            </div>
+                        ` : `
+                            ${activeOrders.map(o => renderSingleOrderCard(o, true)).join('')}
+                        `}
+                    </div>
+
+                    <!-- SECTION 2: Order History (Delivered & Completed) -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px; color:var(--text-main);">
+                                <i class="fa-solid fa-clock-rotate-left" style="color:var(--secondary);"></i> Order History (${deliveredOrders.length})
+                            </h3>
+                            <span style="font-size:11px; background:var(--secondary-light); color:var(--secondary); padding:3px 8px; border-radius:var(--radius-full); font-weight:700;">
+                                Delivered & Completed Orders
+                            </span>
+                        </div>
+
+                        ${deliveredOrders.length === 0 ? `
+                            <div style="padding:20px; background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-md); text-align:center; color:var(--text-muted); font-size:13px;">
+                                No past delivered orders yet.
+                            </div>
+                        ` : `
+                            ${deliveredOrders.map(o => renderSingleOrderCard(o, false)).join('')}
+                        `}
+                    </div>
+                `}
             </main>
             ${this.renderBottomNav()}
         `;
@@ -885,35 +1011,29 @@ export class CustomerModule {
             <main class="main-content">
                 <!-- User Profile Card -->
                 <div style="background:var(--card-bg); padding:20px; border-radius:var(--radius-lg); border:1px solid var(--card-border); display:flex; align-items:center; gap:16px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" style="width:64px; height:64px; border-radius:var(--radius-full); object-fit:cover;">
+                    <div style="width:64px; height:64px; border-radius:var(--radius-full); background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; border:2px solid var(--primary);">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
                     <div style="flex:1;">
-                        <h3 style="font-size:18px; margin-bottom:2px;">${user.name}</h3>
-                        <div style="font-size:12px; color:var(--text-muted);">${user.phone} • ${user.email}</div>
+                        <h3 style="font-size:18px; margin-bottom:2px; font-weight:700;">${user ? user.name : 'Customer User'}</h3>
+                        <div style="font-size:12px; color:var(--text-muted);">${user ? user.phone : ''} • ${user ? user.email : ''}</div>
                     </div>
-                    <button class="btn-secondary" style="color:var(--emergency-red); padding:8px 12px; font-size:12px;" onclick="MediApp.logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-                </div>
-
-                <!-- Saved Addresses Section -->
-                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:18px; margin-bottom:20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h3 style="font-size:16px;"><i class="fa-solid fa-location-dot" style="color:var(--primary);"></i> Saved Delivery Addresses</h3>
-                        <button class="add-cart-btn" style="padding:6px 12px; font-size:12px;" onclick="MediApp.openAddressModal()"><i class="fa-solid fa-plus"></i> Add Address</button>
-                    </div>
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        ${savedAddresses.map(addr => `
-                            <div style="padding:12px; border:1px solid var(--card-border); border-radius:var(--radius-md); background:var(--background); display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <strong style="font-size:13px;"><i class="fa-solid fa-house"></i> ${addr.label}</strong>
-                                    <div style="font-size:12px; color:var(--text-muted);">${addr.text}</div>
-                                </div>
-                                <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.showToast('Address selected as default')">Default</button>
-                            </div>
-                        `).join('')}
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <button class="add-cart-btn" style="padding:6px 12px; font-size:12px;" onclick="MediApp.openEditProfileModal()"><i class="fa-solid fa-user-pen"></i> Edit Profile</button>
+                        <button class="btn-secondary" style="color:var(--emergency-red); padding:6px 12px; font-size:11px;" onclick="MediApp.logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
                     </div>
                 </div>
 
                 <!-- Profile Options List -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:8px; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openEditProfileModal()">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-user-pen" style="color:var(--primary); font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">Edit Profile</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
                     <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.setCustomerTab('orders')">
                         <div style="display:flex; align-items:center; gap:12px;">
                             <i class="fa-solid fa-box-archive" style="color:var(--primary); font-size:18px;"></i>
@@ -922,21 +1042,6 @@ export class CustomerModule {
                         <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
                     </div>
 
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openAddressModal()">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <i class="fa-solid fa-map-location-dot" style="color:var(--secondary); font-size:18px;"></i>
-                            <span style="font-weight:700; font-size:14px;">Saved Addresses</span>
-                        </div>
-                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
-                    </div>
-
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.setCustomerTab('prescription')">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <i class="fa-solid fa-file-prescription" style="color:var(--warning-amber); font-size:18px;"></i>
-                            <span style="font-weight:700; font-size:14px;">Prescription History</span>
-                        </div>
-                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
-                    </div>
 
                     <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openNotificationsModal()">
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -973,7 +1078,6 @@ export class CustomerModule {
                             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:8px;">
                                 <div>
                                     <strong>${p.shop_name}</strong>
-                                    <div style="font-size:12px; color:var(--text-muted);">${p.address} • 📍 ${p.distance}</div>
                                 </div>
                                 <button class="btn-secondary" onclick="MediApp.viewPharmacyDetails('${p.id}')">Visit Store</button>
                             </div>
@@ -1017,7 +1121,6 @@ export class CustomerModule {
                                     <img src="${p.logo}" style="width:54px; height:54px; border-radius:var(--radius-md); object-fit:cover;">
                                     <div>
                                         <div style="font-weight:800; font-size:16px; color:var(--text-main);">${p.shop_name}</div>
-                                        <div style="font-size:12px; color:var(--text-muted);">${p.address}</div>
                                     </div>
                                 </div>
                                 <span style="background:var(--secondary-light); color:var(--secondary); font-weight:800; font-size:11px; padding:4px 8px; border-radius:4px; white-space:nowrap;">
@@ -1025,8 +1128,7 @@ export class CustomerModule {
                                 </span>
                             </div>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; color:var(--primary); margin-bottom:14px; background:var(--background); padding:8px 12px; border-radius:var(--radius-sm);">
-                                <span>📍 ${p.distance} away from you</span>
+                            <div style="display:flex; justify-content:flex-end; align-items:center; font-size:12px; font-weight:700; color:var(--primary); margin-bottom:14px; background:var(--background); padding:8px 12px; border-radius:var(--radius-sm);">
                                 <span>⭐ ${p.rating} (${p.reviews_count || 12} reviews)</span>
                             </div>
 

@@ -5,17 +5,31 @@ import { MOCK_PHARMACIES, MOCK_MEDICINES } from './data.js';
 export class AdminModule {
     constructor(app) {
         this.app = app;
-        this.activeTab = 'overview'; // overview, users, pharmacies, medicines, orders, partners, analytics, reports
+        const savedTab = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('medifind_admin_tab') : null;
+        this.activeTab = savedTab || 'medicines';
     }
 
     render() {
-        const totalRevenue = this.app.state.orders.reduce((sum, o) => sum + o.total_amount, 0);
-        const usersList = this.app.state.usersList || [
-            { id: 'usr_1', name: 'Alex Johnson', email: 'alex@example.com', role: 'customer', status: 'Active' },
-            { id: 'usr_2', name: 'Priya Sharma', email: 'priya@example.com', role: 'customer', status: 'Active' },
-            { id: 'usr_pharm_1', name: 'Dr. S. K. Gupta', email: 'apollo@example.com', role: 'pharmacy', status: 'Active' },
-            { id: 'usr_driver_1', name: 'Rohan Verma', email: 'rohan@example.com', role: 'delivery', status: 'Active' }
-        ];
+        const savedTab = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('medifind_admin_tab') : null;
+        if (savedTab) {
+            this.activeTab = savedTab;
+        }
+
+        const totalRevenue = (this.app.state.orders || []).reduce((sum, o) => sum + (o.total_amount || 0), 0);
+        const allOrders = this.app.state.orders || [];
+        const usersList = (this.app.state && Array.isArray(this.app.state.usersList)) ? this.app.state.usersList : [];
+
+        // Auto-fetch users & orders if empty when rendering Admin Panel
+        if (usersList.length === 0 && !this._fetchingUsers) {
+            this._fetchingUsers = true;
+            Promise.all([this.app.loadAllUsers(), this.app.loadSavedOrders()]).finally(() => {
+                this._fetchingUsers = false;
+            });
+        }
+
+        if (this.activeTab === 'overview' || this.activeTab === 'analytics' || this.activeTab === 'reports') {
+            this.activeTab = 'medicines';
+        }
 
         return `
             <header class="navbar-top">
@@ -34,13 +48,8 @@ export class AdminModule {
             </header>
 
             <main class="main-content">
-                <!-- Navigation Tabs Bar (8 Sections) -->
+                <!-- Navigation Tabs Bar -->
                 <div style="display:flex; gap:6px; background:var(--card-bg); padding:8px; border-radius:var(--radius-md); border:1px solid var(--card-border); margin-bottom:20px; overflow-x:auto; scrollbar-width:none;">
-                    <button class="btn-secondary ${this.activeTab === 'overview' ? 'active' : ''}" 
-                            style="${this.activeTab === 'overview' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
-                            onclick="MediApp.setAdminTab('overview')">
-                        <i class="fa-solid fa-chart-pie"></i> Overview
-                    </button>
                     <button class="btn-secondary ${this.activeTab === 'users' ? 'active' : ''}" 
                             style="${this.activeTab === 'users' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
                             onclick="MediApp.setAdminTab('users')">
@@ -49,7 +58,7 @@ export class AdminModule {
                     <button class="btn-secondary ${this.activeTab === 'pharmacies' ? 'active' : ''}" 
                             style="${this.activeTab === 'pharmacies' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
                             onclick="MediApp.setAdminTab('pharmacies')">
-                        <i class="fa-solid fa-store"></i> Pharmacies (${this.app.state.pharmacies.length})
+                        <i class="fa-solid fa-store-medical"></i> Supply Store
                     </button>
                     <button class="btn-secondary ${this.activeTab === 'medicines' ? 'active' : ''}" 
                             style="${this.activeTab === 'medicines' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
@@ -65,16 +74,6 @@ export class AdminModule {
                             style="${this.activeTab === 'partners' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
                             onclick="MediApp.setAdminTab('partners')">
                         <i class="fa-solid fa-motorcycle"></i> Fleet
-                    </button>
-                    <button class="btn-secondary ${this.activeTab === 'analytics' ? 'active' : ''}" 
-                            style="${this.activeTab === 'analytics' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
-                            onclick="MediApp.setAdminTab('analytics')">
-                        <i class="fa-solid fa-chart-line"></i> Financials
-                    </button>
-                    <button class="btn-secondary ${this.activeTab === 'reports' ? 'active' : ''}" 
-                            style="${this.activeTab === 'reports' ? 'background:var(--primary); color:white; font-weight:700;' : ''}"
-                            onclick="MediApp.setAdminTab('reports')">
-                        <i class="fa-solid fa-file-export"></i> Reports
                     </button>
                 </div>
 
@@ -96,10 +95,10 @@ export class AdminModule {
                         </div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-icon" style="background:#dcfce7; color:#16a34a;"><i class="fa-solid fa-store"></i></div>
+                        <div class="metric-icon" style="background:#dcfce7; color:#16a34a;"><i class="fa-solid fa-store-medical"></i></div>
                         <div>
-                            <div class="metric-val">${this.app.state.pharmacies.length}</div>
-                            <div class="metric-lbl">Verified Pharmacies</div>
+                            <div class="metric-val">1 Store</div>
+                            <div class="metric-lbl">Medicine Supply Store</div>
                         </div>
                     </div>
                     <div class="metric-card">
@@ -120,8 +119,9 @@ export class AdminModule {
 
                 <!-- Admin Action Center Bar -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; margin-bottom:24px; display:flex; gap:12px; flex-wrap:wrap;">
-                    <button class="add-cart-btn" onclick="MediApp.setAdminTab('pharmacies')"><i class="fa-solid fa-check-double"></i> Review Pharmacy Registrations</button>
+                    <button class="add-cart-btn" onclick="MediApp.setAdminTab('pharmacies')"><i class="fa-solid fa-store-medical"></i> Manage Medicine Supply Store</button>
                     <button class="btn-secondary" onclick="MediApp.setAdminTab('users')"><i class="fa-solid fa-user-shield"></i> Manage User Statuses</button>
+                    <button class="btn-secondary" style="color:var(--emergency-red); font-weight:700;" onclick="MediApp.resetAdminOrdersAndRevenue()"><i class="fa-solid fa-rotate-left"></i> Reset Orders & Revenue (₹0)</button>
                     <button class="btn-secondary" onclick="MediApp.generateAdminReport()"><i class="fa-solid fa-download"></i> Export Audit Report</button>
                 </div>
 
@@ -133,14 +133,19 @@ export class AdminModule {
             `;
         }
 
-        // TAB 2: User Management (Suspend / Activate)
+        // TAB 2: User Management (Admin & Users with Placed Orders Only)
         if (this.activeTab === 'users') {
+            const allOrders = this.app.state.orders || [];
+
             return `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                     <div>
-                        <h3 style="font-size:18px;">Platform User Management</h3>
-                        <p style="font-size:12px; color:var(--text-muted);">Manage registered customer, pharmacy, and driver accounts</p>
+                        <h3 style="font-size:18px;">Active Users & Order Activity (${usersList.length} Accounts)</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Displays System Admin and users with active/completed orders</p>
                     </div>
+                    <button class="btn-secondary" style="padding:6px 12px; font-size:12px; font-weight:700;" onclick="MediApp.fetchRealtimeAdminUsers()">
+                        <i class="fa-solid fa-rotate"></i> Sync Live Users Data
+                    </button>
                 </div>
 
                 <div class="data-table-container">
@@ -148,79 +153,53 @@ export class AdminModule {
                         <thead>
                             <tr>
                                 <th>User ID & Name</th>
-                                <th>Email</th>
-                                <th>Assigned Role</th>
-                                <th>Account Status</th>
+                                <th>Email & Phone</th>
+                                <th>Role</th>
+                                <th>Real-Time Orders</th>
+                                <th>Total Spend</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${usersList.map(u => {
                                 const isSuspended = u.status === 'Suspended';
+                                const userOrders = allOrders.filter(o => o.user_id === u.id || (o.customer_name && u.name && o.customer_name.toLowerCase() === u.name.toLowerCase()));
+                                const userTotalSpent = userOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
                                 return `
                                     <tr>
-                                        <td><strong>${u.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${u.id}</span></td>
-                                        <td>${u.email}</td>
-                                        <td><span class="role-badge-btn" style="text-transform:uppercase;">${u.role}</span></td>
-                                        <td><span style="font-weight:800; color:${isSuspended ? 'var(--emergency-red)' : 'var(--secondary)'};">${u.status || 'Active'}</span></td>
                                         <td>
-                                            <button class="btn-secondary" style="color:${isSuspended ? 'var(--secondary)' : 'var(--emergency-red)'}; font-weight:700;" onclick="MediApp.toggleUserStatus('${u.id}')">
-                                                <i class="fa-solid ${isSuspended ? 'fa-user-check' : 'fa-user-slash'}"></i> ${isSuspended ? 'Activate User' : 'Suspend User'}
-                                            </button>
+                                            <strong>${u.name}</strong><br>
+                                            <span style="font-size:10px; color:var(--text-muted); font-family:monospace;">${u.id}</span>
                                         </td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        }
-
-        // TAB 3: Pharmacy Approvals & Suspension
-        if (this.activeTab === 'pharmacies') {
-            return `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <div>
-                        <h3 style="font-size:18px;">Registered Pharmacies & License Approvals</h3>
-                        <p style="font-size:12px; color:var(--text-muted);">Verify drug license compliance and control store operational statuses</p>
-                    </div>
-                </div>
-
-                <div class="data-table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Pharmacy Shop</th>
-                                <th>Owner</th>
-                                <th>Drug License</th>
-                                <th>Rating</th>
-                                <th>Verification Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${this.app.state.pharmacies.map(p => {
-                                const isVerified = p.license_verified !== false;
-                                const isSuspended = p.status === 'suspended';
-                                return `
-                                    <tr>
-                                        <td><strong>${p.shop_name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${p.address}</span></td>
-                                        <td>${p.owner_name}</td>
-                                        <td><code>${p.license_number}</code></td>
-                                        <td><span class="star-rating"><i class="fa-solid fa-star"></i> ${p.rating}</span></td>
                                         <td>
-                                            <span style="font-weight:800; color:${isSuspended ? 'var(--emergency-red)' : isVerified ? 'var(--secondary)' : 'var(--warning-amber)'};">
-                                                ${isSuspended ? 'Suspended' : isVerified ? 'Verified ✅' : 'Pending Approval ⏳'}
+                                            <span style="font-size:13px;">${u.email}</span><br>
+                                            <span style="font-size:11px; color:var(--text-muted);">${u.phone || '+91 98765 43210'}</span>
+                                        </td>
+                                        <td>
+                                            <span class="role-badge-btn" style="text-transform:uppercase; font-size:10px;">${u.role}</span>
+                                        </td>
+                                        <td>
+                                            <strong style="color:var(--primary);">${userOrders.length} Orders</strong>
+                                            ${userOrders.length > 0 ? `
+                                                <br><span style="font-size:10px; color:var(--text-muted);">Latest: ${userOrders[0].id}</span>
+                                            ` : ''}
+                                        </td>
+                                        <td>
+                                            <strong style="color:var(--secondary); font-size:14px;">₹${userTotalSpent.toFixed(2)}</strong>
+                                        </td>
+                                        <td>
+                                            <span style="font-weight:800; color:${isSuspended ? 'var(--emergency-red)' : 'var(--secondary)'}; font-size:12px;">
+                                                ${isSuspended ? 'Suspended 🚫' : 'Active ✅'}
                                             </span>
                                         </td>
                                         <td>
                                             <div style="display:flex; gap:6px;">
-                                                ${!isVerified ? `
-                                                    <button class="add-cart-btn" style="padding:4px 8px; font-size:11px;" onclick="MediApp.approvePharmacy('${p.id}')"><i class="fa-solid fa-check"></i> Approve License</button>
-                                                ` : ''}
-                                                <button class="btn-secondary" style="color:${isSuspended ? 'var(--secondary)' : 'var(--emergency-red)'}; padding:4px 8px; font-size:11px;" onclick="MediApp.suspendPharmacy('${p.id}')">
-                                                    <i class="fa-solid ${isSuspended ? 'fa-rotate-left' : 'fa-ban'}"></i> ${isSuspended ? 'Restore' : 'Suspend'}
+                                                <button class="add-cart-btn" style="padding:4px 8px; font-size:11px;" onclick="MediApp.viewUserOrdersModal('${u.id}', '${u.name}')">
+                                                    <i class="fa-solid fa-receipt"></i> Orders (${userOrders.length})
+                                                </button>
+                                                <button class="btn-secondary" style="color:${isSuspended ? 'var(--secondary)' : 'var(--emergency-red)'}; padding:4px 8px; font-size:11px;" onclick="MediApp.toggleUserStatus('${u.id}')">
+                                                    <i class="fa-solid ${isSuspended ? 'fa-user-check' : 'fa-user-slash'}"></i> ${isSuspended ? 'Activate' : 'Suspend'}
                                                 </button>
                                             </div>
                                         </td>
@@ -233,31 +212,112 @@ export class AdminModule {
             `;
         }
 
-        // TAB 4: Master Medicines Catalog
+        // TAB 3: Medicine Supply Store Management
+        if (this.activeTab === 'pharmacies') {
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:18px;"><i class="fa-solid fa-store-medical" style="color:var(--primary);"></i> Medicine Supply Store Management</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Manage official supply store location, coordinates, delivery radius & pricing rules</p>
+                    </div>
+                    <a href="https://maps.app.goo.gl/GAJhNha3TsA4P29r7" target="_blank" class="add-cart-btn" style="padding:8px 14px; font-size:12px; text-decoration:none;">
+                        <i class="fa-solid fa-map-location-dot"></i> Open Google Maps Link
+                    </a>
+                </div>
+
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:20px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <h2 style="font-size:20px; font-weight:800; color:var(--text-main);">Nazarathpet Medicine Supply Store</h2>
+                                <span style="background:var(--secondary-light); color:var(--secondary); padding:2px 8px; border-radius:var(--radius-full); font-size:11px; font-weight:800;">ACTIVE & SERVING ORDERS ✅</span>
+                            </div>
+                            <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">
+                                <i class="fa-solid fa-location-dot" style="color:var(--emergency-red);"></i> Nazarathpet, Thirumazhisai, Poonamallee, Chennai, Tamil Nadu
+                            </p>
+                        </div>
+                        <a href="https://maps.app.goo.gl/GAJhNha3TsA4P29r7" target="_blank" style="font-size:12px; font-weight:700; color:var(--primary); text-decoration:none; display:flex; align-items:center; gap:6px;">
+                            <span>https://maps.app.goo.gl/GAJhNha3TsA4P29r7</span>
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </a>
+                    </div>
+
+                    <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:20px;">
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">GPS COORDINATES</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--primary); margin-top:2px;">13.043913, 80.074262</div>
+                        </div>
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">DELIVERY RADIUS</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--secondary); margin-top:2px;">Strictly 15.0 Km</div>
+                        </div>
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">DELIVERY RATE</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--primary); margin-top:2px;">₹10.00 / Km</div>
+                        </div>
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">TAX RATE</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--text-main); margin-top:2px;">5% GST</div>
+                        </div>
+                    </div>
+
+                    <div style="border-top:1px dashed var(--card-border); padding-top:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <div style="font-size:12px; color:var(--text-muted);">
+                            <strong>Drug License:</strong> <code>TN-MED-SUPPLY-2026-908</code> • <strong>Phone:</strong> +91 98765 12345 • <strong>Operating Hours:</strong> 24/7 Open
+                        </div>
+                        <button class="btn-secondary" style="font-size:12px;" onclick="MediApp.showToast('✅ Supply store configuration updated')">
+                            <i class="fa-solid fa-gear"></i> Update Settings
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // TAB 4: Master Medicines Catalog & Price Management
         if (this.activeTab === 'medicines') {
             return `
-                <h3 style="font-size:18px; margin-bottom:16px;">Master Medicines Catalog (${this.app.state.medicines.length} Items)</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:18px;">Master Medicines Catalog (${this.app.state.medicines.length} Items)</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Add new medicines, edit prices, and manage stock inventory</p>
+                    </div>
+                    <button class="add-cart-btn" style="padding:8px 14px; font-size:12px;" onclick="MediApp.openAddMedicineModal()">
+                        <i class="fa-solid fa-plus"></i> Add New Medicine
+                    </button>
+                </div>
+
                 <div class="data-table-container">
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Brand & Generic Composition</th>
                                 <th>Category</th>
-                                <th>Mfr</th>
+                                <th>Manufacturer</th>
                                 <th>Unit Price</th>
                                 <th>Total Stock</th>
-                                <th>Pharmacy</th>
+                                <th>Supply Store</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${this.app.state.medicines.slice(0, 15).map(m => `
-                                <tr>
+                            ${this.app.state.medicines.map(m => `
+                                <tr id="med_row_${m.id}">
                                     <td><strong>${m.name}</strong><br><span style="font-size:11px; color:var(--primary);">🧪 ${m.generic_name}</span></td>
-                                    <td>${m.category}</td>
+                                    <td><span style="font-size:11px; background:var(--primary-light); color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:700;">${m.category}</span></td>
                                     <td>${m.manufacturer || 'Micro Labs'}</td>
-                                    <td>₹${m.price.toFixed(2)}</td>
-                                    <td><span style="font-weight:800; color:${m.stock < 20 ? 'var(--emergency-red)' : 'var(--secondary)'};">${m.stock} units</span></td>
-                                    <td>${m.pharmacy_name}</td>
+                                    <td><strong id="med_price_${m.id}" style="color:var(--secondary); font-size:14px;">₹${parseFloat(m.price).toFixed(2)}</strong></td>
+                                    <td><span id="med_stock_${m.id}" style="font-weight:800; color:${m.stock < 20 ? 'var(--emergency-red)' : 'var(--text-main)'};">${m.stock} units</span></td>
+                                    <td>Nazarathpet Medicine Supply Store</td>
+                                    <td>
+                                        <div style="display:flex; gap:6px;">
+                                            <button type="button" class="add-cart-btn" style="padding:4px 8px; font-size:11px;" onclick="MediApp.openEditMedicinePriceModal('${m.id}')">
+                                                <i class="fa-solid fa-pen-to-square"></i> Change Price & Stock
+                                            </button>
+                                            <button type="button" class="btn-secondary" style="color:var(--emergency-red); padding:4px 8px; font-size:11px;" onclick="MediApp.deleteMedicine('${m.id}')">
+                                                <i class="fa-solid fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -268,23 +328,51 @@ export class AdminModule {
 
         // TAB 5: Platform Orders Stream
         if (this.activeTab === 'orders') {
+            const allOrders = this.app.state.orders || [];
+
             return `
-                <h3 style="font-size:18px; margin-bottom:16px;">Platform Live Orders Stream</h3>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    ${this.app.state.orders.map(o => `
-                        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <strong style="color:var(--primary); font-size:15px;">${o.id}</strong>
-                                <span style="font-size:12px; color:var(--text-muted); margin-left:8px;">Customer: ${o.customer_name} • Pharmacy: ${o.pharmacy_name}</span>
-                                <div style="font-size:12px; margin-top:4px;">Items: ${o.items.map(it => `${it.quantity}x ${it.name}`).join(', ')}</div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-weight:800; font-size:16px; color:var(--secondary);">₹${o.total_amount.toFixed(2)}</div>
-                                <span class="role-badge-btn">${o.order_status}</span>
-                            </div>
-                        </div>
-                    `).join('')}
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:18px;">Platform Live Orders Stream (${allOrders.length} Orders)</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Real-time stream of all platform orders across customers and pharmacies</p>
+                    </div>
+                    <button class="btn-secondary" style="padding:6px 12px; font-size:12px; font-weight:700;" onclick="MediApp.loadSavedOrders(); MediApp.render();">
+                        <i class="fa-solid fa-rotate"></i> Sync Live Orders Data
+                    </button>
                 </div>
+
+                ${allOrders.length === 0 ? `
+                    <div style="padding:40px; background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-lg); text-align:center; color:var(--text-muted);">
+                        <i class="fa-solid fa-box-open" style="font-size:36px; margin-bottom:12px; color:var(--primary);"></i>
+                        <h4 style="font-size:16px; color:var(--text-main); margin-bottom:4px;">No Orders in Live Stream</h4>
+                        <p style="font-size:12px; max-width:400px; margin:0 auto 16px auto;">New customer orders will appear here automatically via WebSockets in real time.</p>
+                        <button class="add-cart-btn" style="margin:0 auto; padding:8px 16px; font-size:13px;" onclick="MediApp.loadSavedOrders(); MediApp.render();">
+                            <i class="fa-solid fa-sync"></i> Refresh Orders Stream
+                        </button>
+                    </div>
+                ` : `
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        ${allOrders.map(o => {
+                            const items = o.items || [];
+                            const total = o.total_amount || 0;
+                            return `
+                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-sm);">
+                                    <div>
+                                        <strong style="color:var(--primary); font-size:15px;">${o.id}</strong>
+                                        <span style="font-size:12px; color:var(--text-muted); margin-left:8px;">Customer: <b>${o.customer_name || o.user_id}</b> • Pharmacy: <b>${o.pharmacy_name || 'Apollo Pharmacy'}</b></span>
+                                        <div style="font-size:12px; margin-top:6px; background:var(--background); padding:6px 10px; border-radius:var(--radius-sm); border:1px solid var(--card-border);">
+                                            Items: ${items.map(it => `<b>${it.quantity || 1}x</b> ${it.name}`).join(', ')}
+                                        </div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <div style="font-weight:800; font-size:16px; color:var(--secondary);">₹${total.toFixed(2)}</div>
+                                        <span class="role-badge-btn" style="margin-top:4px; display:inline-block;">${o.order_status}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `}
             `;
         }
 

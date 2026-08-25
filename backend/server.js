@@ -33,8 +33,15 @@ import { createPlacesRoutes } from './routes/placesRoutes.js';
 // Socket Handler
 import { initSocketHandler } from './socket/socketHandler.js';
 
-// Seed Initializer
+// Database Connectors
+import { connectDB } from './config/db.js';
+
+// Seed Initializer & Sync Engine
 import { seedDatabase } from './seed/seed.js';
+import { syncAllDataToMongo } from './seed/mongoSync.js';
+
+// Connect MongoDB Atlas
+connectDB();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,8 +57,14 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Attach Socket.IO instance to all HTTP requests for real-time broadcasts
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
 
 // Serve frontend static files
 app.use(express.static(rootDir));
@@ -64,6 +77,7 @@ const orderStore = new OrderStore();
 const prescriptionStore = new PrescriptionStore();
 
 seedDatabase(userStore, pharmacyStore, medicineStore, orderStore, prescriptionStore);
+syncAllDataToMongo(userStore, pharmacyStore, medicineStore, orderStore, prescriptionStore);
 
 // Controllers
 const authCtrl = authController(userStore);
@@ -79,6 +93,16 @@ app.use('/api/pharmacies', createPharmacyRoutes(pharmCtrl));
 app.use('/api/orders', createOrderRoutes(orderCtrl));
 app.use('/api/prescriptions', createPrescriptionRoutes(prescriptionCtrl));
 app.use('/api/places', createPlacesRoutes());
+
+// Direct APK Download Endpoint
+app.get(['/download', '/medifind.apk'], (req, res) => {
+    const apkPath = path.join(rootDir, 'release', 'MediFind.apk');
+    res.download(apkPath, 'MediFind.apk', (err) => {
+        if (err && !res.headersSent) {
+            res.status(404).send('APK file not found. Please build the application first.');
+        }
+    });
+});
 
 // Client Config API (exposes non-sensitive app settings like Google Maps API key availability)
 app.get('/api/config', (req, res) => {
@@ -123,6 +147,19 @@ app.get('/api/admin/stats', (req, res) => {
 initSocketHandler(io, orderStore);
 
 // Start Server
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Error: Port ${PORT} is already in use by another process or sockets are in TIME_WAIT.`);
+        console.error(`💡 Solutions:`);
+        console.error(`   1. Wait 5-10 seconds for TCP connections to release and re-run.`);
+        console.error(`   2. Change PORT in your .env file (e.g. PORT=5001).`);
+        console.error(`   3. Stop any existing Node server running in another terminal window.`);
+        process.exit(1);
+    } else {
+        console.error(`❌ Server error:`, err);
+    }
+});
+
 server.listen(PORT, () => {
     console.log(`=======================================================`);
     console.log(`🏥 MediFind Full-Stack Server Running on Port ${PORT}`);

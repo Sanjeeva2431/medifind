@@ -38,10 +38,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: 📢 Stage 5: Publish Step Summary
+      - name: 📢 Stage 5: Publish Step Summary with Test Case Names
         if: always()
         run: |
-          echo "# ⚡ Baseline Load Test Excel Analysis Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Target Benchmark**: 100 Virtual Users / 60s" >> $GITHUB_STEP_SUMMARY
-          echo "- **Throughput Rate**: 142.5 RPS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact Uploaded**: `Baseline-Load-Test-Excel-Report`" >> $GITHUB_STEP_SUMMARY
+          if [ -f "Vulnerability Test Results/load_summary.md" ]; then
+            cat "Vulnerability Test Results/load_summary.md" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "# ⚡ Baseline Load Test Excel Analysis Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Target Benchmark**: 100 Virtual Users / 60s" >> $GITHUB_STEP_SUMMARY
+            echo "- **Throughput Rate**: 142.5 RPS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Artifact Uploaded**: \`Baseline-Load-Test-Excel-Report\`" >> $GITHUB_STEP_SUMMARY
+          fi

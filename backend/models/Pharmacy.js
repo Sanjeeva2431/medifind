@@ -24,4 +24,8 @@ export class PharmacyStore {
         Object.assign(p, updates);
         return p;
     }
+
+    delete(id) {
+        return this.pharmacies.delete(id);
+    }
 }

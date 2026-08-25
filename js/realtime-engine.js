@@ -1,6 +1,8 @@
 // MediFind Realtime Sync Engine (Firebase onSnapshot Listeners & Socket.IO Event Streams)
 // Enables Zero Page Refresh Realtime Stock Updates, Order Status Updates, GPS Tracking, and Notifications
 
+import { MOCK_MEDICINES } from './data.js';
+
 export class RealtimeEngine {
     constructor(app) {
         this.app = app;
@@ -55,7 +57,7 @@ export class RealtimeEngine {
             }
         });
 
-        // 4. Realtime Notifications Listener
+        // 4. Realtime Notification Dispatcher
         this.socket.on('notification_received', (data) => {
             console.log('⚡ Realtime Notification Received:', data);
             this.app.state.notifications.unshift({
@@ -67,6 +69,30 @@ export class RealtimeEngine {
             });
             this.app.showToast(`🔔 ${data.title}: ${data.body}`);
             this.app.render();
+        });
+
+        // 5. Realtime Medicine Price & Catalog Update Listener
+        this.socket.on('medicine_updated', (data) => {
+            console.log('⚡ Realtime Medicine Price Update Received:', data);
+            if (this.app && this.app.state && this.app.state.medicines) {
+                const med = this.app.state.medicines.find(m => m.id === data.id);
+                if (med) {
+                    if (data.price !== undefined) med.price = data.price;
+                    if (data.stock !== undefined) med.stock = data.stock;
+                    if (data.medicine) Object.assign(med, data.medicine);
+                } else if (data.medicine) {
+                    this.app.state.medicines.unshift(data.medicine);
+                }
+                const mockMed = MOCK_MEDICINES.find(m => m.id === data.id);
+                if (mockMed) {
+                    if (data.price !== undefined) mockMed.price = data.price;
+                    if (data.stock !== undefined) mockMed.stock = data.stock;
+                }
+                if (typeof this.app.saveMedicinesToStorage === 'function') {
+                    this.app.saveMedicinesToStorage();
+                }
+                this.app.render(); // Instant Zero-Refresh Re-render across all connected users!
+            }
         });
     }
 

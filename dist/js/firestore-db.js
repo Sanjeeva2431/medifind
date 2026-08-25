@@ -24,8 +24,11 @@ export class FirestoreDatabase {
         seedFirestore(this);
         // Load custom registered users from localStorage
         try {
-            const savedCustomUsers = JSON.parse(localStorage.getItem('medifind_custom_users') || '[]');
-            savedCustomUsers.forEach(u => this.collections.Users.set(u.id, u));
+            const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('medifind_custom_users') : null;
+            const savedCustomUsers = (raw && raw !== 'undefined' && raw !== 'null') ? JSON.parse(raw) : [];
+            if (Array.isArray(savedCustomUsers)) {
+                savedCustomUsers.forEach(u => this.collections.Users.set(u.id, u));
+            }
         } catch (e) {
             console.error('[Firestore DB] Error restoring saved custom users:', e);
         }

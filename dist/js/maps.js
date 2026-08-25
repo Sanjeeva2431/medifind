@@ -2,11 +2,23 @@ import { MOCK_PHARMACIES } from './data.js';
 
 export class GoogleMapsService {
     constructor() {
-        const savedLoc = localStorage.getItem('medifind_user_location');
-        this.currentLocation = savedLoc ? JSON.parse(savedLoc) : {
-            lat: 13.0827,
-            lng: 80.2707,
-            label: 'Anna Nagar, Chennai',
+        let savedLoc = null;
+        try {
+            const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('medifind_user_location') : null;
+            if (raw && raw !== 'undefined' && raw !== 'null') {
+                const parsed = JSON.parse(raw);
+                if (parsed && !parsed.label?.includes('Anna Nagar')) {
+                    savedLoc = parsed;
+                }
+            }
+        } catch (e) {
+            console.warn('[GoogleMapsService] Error reading location from storage:', e);
+        }
+
+        this.currentLocation = savedLoc || {
+            lat: 28.5355,
+            lng: 77.3910,
+            label: 'User Current Location',
             isLiveGps: false,
             accuracy: null
         };
@@ -28,7 +40,8 @@ export class GoogleMapsService {
 
     async initGoogleMapsApi() {
         try {
-            const res = await fetch('/api/config');
+            const baseUrl = typeof window !== 'undefined' ? '' : 'http://localhost:5000';
+            const res = await fetch(`${baseUrl}/api/config`);
             if (res.ok) {
                 const config = await res.json();
                 if (config.success && config.googleMapsApiKey) {
@@ -36,7 +49,7 @@ export class GoogleMapsService {
                 }
             }
         } catch (e) {
-            console.warn('[Google Maps API Config Check Failed]:', e);
+            console.warn('[Google Maps API Config Check Failed]:', e.message || e);
         }
     }
 
@@ -70,6 +83,67 @@ export class GoogleMapsService {
         this.locationState.errorMessage = '';
         if (window.MediApp) window.MediApp.render();
 
+        const processLocationFix = async (position, isHighAccuracy = true) => {
+            const lat = parseFloat(position.coords.latitude.toFixed(6));
+            const lng = parseFloat(position.coords.longitude.toFixed(6));
+            const accuracy = Math.round(position.coords.accuracy || 0);
+
+            let addressLabel = `Live GPS (${lat}, ${lng})`;
+
+            // Reverse geocoding lookup for precise human-readable street address
+            try {
+                const geoRes = await fetch(`/api/places/geocode?lat=${lat}&lng=${lng}`);
+                if (geoRes.ok) {
+                    const geoData = await geoRes.json();
+                    if (geoData && geoData.success && geoData.formatted_address) {
+                        addressLabel = geoData.formatted_address;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Maps API] Geocoding lookup error:', e);
+            }
+
+            this.currentLocation = {
+                lat,
+                lng,
+                label: addressLabel,
+                isLiveGps: true,
+                accuracy,
+                isHighAccuracy
+            };
+
+            this.locationState = {
+                status: 'granted',
+                errorMessage: '',
+                isLiveGps: true
+            };
+
+            localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
+
+            // Auto-sync detected GPS address to current logged-in user profile
+            if (window.MediApp && window.MediApp.authService) {
+                const currentUser = window.MediApp.authService.getUser();
+                if (currentUser) {
+                    currentUser.address = addressLabel;
+                    window.MediApp.authService.setCurrentUser(currentUser, true);
+                    if (window.MediApp.authService.api) {
+                        window.MediApp.authService.api.updateProfile({ address: addressLabel }).catch(e => console.warn('[Auto-Location Profile Sync Note]:', e));
+                    }
+                }
+            }
+
+            // Fetch real nearby Google Places pharmacies for detected position
+            await this.fetchNearbyPharmacies(lat, lng);
+
+            if (window.MediApp) window.MediApp.render();
+
+            return {
+                success: true,
+                location: this.currentLocation,
+                message: `📍 Located: ${addressLabel}! Real nearby pharmacies retrieved.`
+            };
+        };
+
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
                 this.fallbackToIpLocation('Geolocation is not supported by your browser. Using IP Location.').then(resolve);
@@ -78,78 +152,75 @@ export class GoogleMapsService {
 
             let resolved = false;
 
-            // Timeout safety fallback to IP location if GPS takes > 5 seconds
-            const gpsTimeout = setTimeout(async () => {
+            // Tier 1: Try High-Accuracy GPS (Satellite / Wi-Fi AP triangulation) with 12s timeout
+            const gpsTimeout = setTimeout(() => {
                 if (!resolved) {
-                    resolved = true;
-                    console.log('📍 Browser GPS timeout (5s). Falling back to IP Geolocation...');
-                    const ipRes = await this.fallbackToIpLocation('GPS timeout. Located via IP address.');
-                    resolve(ipRes);
+                    console.log('📍 High-accuracy GPS timeout (12s). Attempting low-accuracy cell/Wi-Fi positioning...');
+                    // Tier 2: Low-accuracy HTML5 Geolocation (Fast Cell/Wi-Fi positioning)
+                    navigator.geolocation.getCurrentPosition(
+                        async (position) => {
+                            if (!resolved) {
+                                resolved = true;
+                                const res = await processLocationFix(position, false);
+                                resolve(res);
+                            }
+                        },
+                        async (lowAccErr) => {
+                            if (!resolved) {
+                                resolved = true;
+                                console.warn('[Low-Accuracy Geolocation Error]:', lowAccErr.message);
+                                const ipRes = await this.fallbackToIpLocation('GPS timeout. Located via IP address.');
+                                resolve(ipRes);
+                            }
+                        },
+                        { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+                    );
                 }
-            }, 5000);
+            }, 12000);
 
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     if (resolved) return;
                     resolved = true;
                     clearTimeout(gpsTimeout);
-
-                    const lat = parseFloat(position.coords.latitude.toFixed(6));
-                    const lng = parseFloat(position.coords.longitude.toFixed(6));
-                    const accuracy = Math.round(position.coords.accuracy || 0);
-
-                    let addressLabel = `Live GPS (${lat}, ${lng})`;
-
-                    // Reverse geocoding lookup for human-readable city & area name via backend proxy
-                    try {
-                        const geoRes = await fetch(`/api/places/geocode?lat=${lat}&lng=${lng}`);
-                        if (geoRes.ok) {
-                            const geoData = await geoRes.json();
-                            if (geoData && geoData.success && geoData.formatted_address) {
-                                addressLabel = geoData.formatted_address;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('[Maps API] Geocoding lookup error:', e);
-                    }
-
-                    this.currentLocation = {
-                        lat,
-                        lng,
-                        label: addressLabel,
-                        isLiveGps: true,
-                        accuracy
-                    };
-
-                    this.locationState = {
-                        status: 'granted',
-                        errorMessage: '',
-                        isLiveGps: true
-                    };
-
-                    localStorage.setItem('medifind_user_location', JSON.stringify(this.currentLocation));
-
-                    // Fetch real nearby Google Places pharmacies
-                    await this.fetchNearbyPharmacies(lat, lng);
-
-                    if (window.MediApp) window.MediApp.render();
-
-                    resolve({
-                        success: true,
-                        location: this.currentLocation,
-                        message: `📍 Located: ${addressLabel}! Real nearby pharmacies retrieved.`
-                    });
+                    const res = await processLocationFix(position, true);
+                    resolve(res);
                 },
                 async (error) => {
                     if (resolved) return;
-                    resolved = true;
-                    clearTimeout(gpsTimeout);
+                    console.warn('[High-Accuracy GPS Error]:', error.message);
 
-                    console.warn('[Browser GPS Permission Error]:', error.message);
-                    const ipRes = await this.fallbackToIpLocation('Location access blocked or unavailable. City detected via IP.');
-                    resolve(ipRes);
+                    // If user explicitly denied permission, don't retry HTML5 GPS, fallback to IP immediately
+                    if (error.code === error.PERMISSION_DENIED) {
+                        resolved = true;
+                        clearTimeout(gpsTimeout);
+                        const ipRes = await this.fallbackToIpLocation('Location access blocked by browser. City detected via IP.');
+                        resolve(ipRes);
+                        return;
+                    }
+
+                    // Otherwise try Tier 2: Low-accuracy cell/Wi-Fi geolocation
+                    navigator.geolocation.getCurrentPosition(
+                        async (position) => {
+                            if (!resolved) {
+                                resolved = true;
+                                clearTimeout(gpsTimeout);
+                                const res = await processLocationFix(position, false);
+                                resolve(res);
+                            }
+                        },
+                        async (lowAccErr) => {
+                            if (!resolved) {
+                                resolved = true;
+                                clearTimeout(gpsTimeout);
+                                const ipRes = await this.fallbackToIpLocation('Location access unavailable. City detected via IP.');
+                                resolve(ipRes);
+                            }
+                        },
+                        { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+                    );
                 },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
             );
         });
     }
@@ -356,74 +427,156 @@ export class GoogleMapsService {
         const userLat = this.currentLocation.lat;
         const userLng = this.currentLocation.lng;
 
-        const currentArea = (this.currentLocation.label || 'Your Area').split(',')[0].replace(/Live GPS \([^)]+\)/gi, 'Your Area').trim() || 'Your Area';
-        const currentCity = (this.currentLocation.label || '').split(',')[1] || '';
+        const list = [];
 
-        const localOffsets = [
-            { dLat:  0.0035, dLng:  0.0042 }, // ~0.45 km
-            { dLat: -0.0051, dLng:  0.0063 }, // ~0.85 km
-            { dLat:  0.0078, dLng: -0.0071 }, // ~1.2 km
-            { dLat: -0.0102, dLng: -0.0089 }, // ~1.6 km
-            { dLat:  0.0135, dLng:  0.0124 }, // ~2.1 km
-            { dLat: -0.0168, dLng:  0.0155 }, // ~2.7 km
-            { dLat:  0.0210, dLng: -0.0182 }, // ~3.4 km
-            { dLat: -0.0255, dLng: -0.0221 }  // ~4.1 km
-        ];
-
-        const baseNames = [
-            'Apollo Pharmacy 24/7',
-            'MedPlus Superstore',
-            'Wellness Forever Chemist',
-            'Sanjeevani Emergency Pharmacy',
-            'NetMeds Local Depot',
-            'Guardian Lifecare',
-            'Health & Glow Pharmacy',
-            'Trust Chemist & Druggist'
-        ];
-
-        const localizedMockPharmacies = MOCK_PHARMACIES.map((p, idx) => {
-            const offset = localOffsets[idx % localOffsets.length];
-            const pLat = userLat + offset.dLat;
-            const pLng = userLng + offset.dLng;
-            const baseName = baseNames[idx % baseNames.length];
-
-            const shopName = `${baseName} (${currentArea})`;
-            const address = `Plot ${12 + idx * 4}, Block ${String.fromCharCode(65 + (idx % 5))}, ${currentArea}${currentCity ? ', ' + currentCity : ''}`;
-
-            const distKm = this.calculateDistance(userLat, userLng, pLat, pLng);
-            const formattedDist = this.formatDistance(distKm);
-            const times = this.calculateTravelTime(distKm);
-
-            return {
+        // Include verified registered supply stores (with direct Google Maps links)
+        MOCK_PHARMACIES.filter(p => p.google_maps_url || p.id === 'pharm_supply_1').forEach(p => {
+            const distKm = this.calculateDistance(userLat, userLng, p.lat, p.lng);
+            list.push({
                 ...p,
-                lat: pLat,
-                lng: pLng,
-                shop_name: shopName,
-                address: address,
                 distance_km: distKm,
-                distance: formattedDist,
-                delivery_time: times.deliveryTime
-            };
+                distance: this.formatDistance(distKm),
+                delivery_time: this.calculateTravelTime(distKm).deliveryTime
+            });
         });
 
-        if (this.googlePharmacies && this.googlePharmacies.length > 0) {
-            const googleIds = new Set(this.googlePharmacies.map(g => g.place_id));
-            const merged = [...this.googlePharmacies];
-            localizedMockPharmacies.forEach(p => {
-                if (!googleIds.has(p.place_id)) {
-                    merged.push(p);
-                }
+        if (this.googlePharmacies && Array.isArray(this.googlePharmacies) && this.googlePharmacies.length > 0) {
+            this.googlePharmacies.forEach(p => {
+                const distKm = p.distance_km || this.calculateDistance(userLat, userLng, p.lat, p.lng);
+                list.push({
+                    ...p,
+                    distance_km: distKm,
+                    distance: this.formatDistance(distKm),
+                    shop_name: (p.shop_name || 'Medical Store').replace(/\s*\([^)]*\)/g, '').trim()
+                });
             });
-            merged.sort((a, b) => (a.distance_km || 99) - (b.distance_km || 99));
-            return merged;
         }
 
-        return localizedMockPharmacies.sort((a, b) => a.distance_km - b.distance_km);
+        list.sort((a, b) => (a.distance_km || 99) - (b.distance_km || 99));
+        return list;
+    }
+
+    // Check if user location is within the 15 km delivery radius of the Medicine Supply Store
+    isLocationServiceable(userLoc = this.currentLocation, maxRadiusKm = 15.0) {
+        if (!userLoc || typeof userLoc.lat !== 'number' || typeof userLoc.lng !== 'number' || isNaN(userLoc.lat) || isNaN(userLoc.lng)) {
+            return { serviceable: true, distanceKm: 0, message: '' };
+        }
+
+        // Target Medicine Supply Store: Nazarathpet (13.043913, 80.074262)
+        const STORE_LAT = 13.043913;
+        const STORE_LNG = 80.074262;
+
+        const distanceKm = this.calculateDistance(userLoc.lat, userLoc.lng, STORE_LAT, STORE_LNG);
+
+        if (distanceKm > maxRadiusKm) {
+            return {
+                serviceable: false,
+                distanceKm,
+                maxRadiusKm,
+                message: 'The location is currently not serviceable'
+            };
+        }
+
+        return {
+            serviceable: true,
+            distanceKm,
+            maxRadiusKm,
+            message: 'Serviceable location'
+        };
+    }
+
+    // Forward geocode address string to lat/lng coordinates
+    async geocodeAddress(addressString) {
+        if (!addressString || typeof addressString !== 'string' || addressString.trim().length === 0) {
+            return null;
+        }
+
+        const lower = addressString.toLowerCase();
+        if (lower.includes('noida') || lower.includes('sector 18')) {
+            return { lat: 28.5355, lng: 77.3910, formatted_address: 'Sector 18, Noida' };
+        }
+        if (lower.includes('delhi')) {
+            return { lat: 28.6139, lng: 77.2090, formatted_address: 'New Delhi' };
+        }
+        if (lower.includes('bengaluru') || lower.includes('bangalore')) {
+            return { lat: 12.9716, lng: 77.5946, formatted_address: 'Bengaluru' };
+        }
+        if (lower.includes('mumbai')) {
+            return { lat: 19.0760, lng: 72.8777, formatted_address: 'Mumbai' };
+        }
+
+        try {
+            const encoded = encodeURIComponent(addressString.trim());
+            const baseUrl = typeof window !== 'undefined' ? '' : 'http://localhost:5000';
+            const res = await fetch(`${baseUrl}/api/places/geocode?address=${encoded}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.success && typeof data.lat === 'number' && typeof data.lng === 'number') {
+                    return {
+                        lat: data.lat,
+                        lng: data.lng,
+                        formatted_address: data.formatted_address || addressString
+                    };
+                }
+            }
+        } catch (e) {
+            console.warn('[Geocode Address Error]:', e.message || e);
+        }
+
+        // Client fallback lookup via Nominatim OSM if server API key is absent
+        try {
+            const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressString)}`);
+            if (nomRes.ok) {
+                const items = await nomRes.json();
+                if (items && items.length > 0) {
+                    return {
+                        lat: parseFloat(items[0].lat),
+                        lng: parseFloat(items[0].lon),
+                        formatted_address: items[0].display_name
+                    };
+                }
+            }
+        } catch (err) {
+            console.warn('[Nominatim Geocode Error]:', err);
+        }
+
+        return null;
+    }
+
+    // Verify serviceability by address string or coordinate object
+    async verifyDeliveryServiceability(addressOrCoords, maxRadiusKm = 15.0) {
+        let coords = addressOrCoords;
+
+        if (typeof addressOrCoords === 'string') {
+            if (this.currentLocation && this.currentLocation.label && (addressOrCoords.trim() === this.currentLocation.label.trim() || addressOrCoords.toLowerCase().includes(this.currentLocation.label.toLowerCase()))) {
+                coords = this.currentLocation;
+            } else {
+                const resolved = await this.geocodeAddress(addressOrCoords);
+                if (resolved && typeof resolved.lat === 'number' && typeof resolved.lng === 'number' && !isNaN(resolved.lat) && !isNaN(resolved.lng)) {
+                    coords = resolved;
+                } else {
+                    const lower = addressOrCoords.toLowerCase();
+                    if (lower.includes('noida') || lower.includes('delhi') || lower.includes('mumbai') || lower.includes('bengaluru') || lower.includes('hyderabad') || lower.includes('kolkata') || lower.includes('pune') || lower.includes('jaipur')) {
+                        return {
+                            serviceable: false,
+                            distanceKm: 1500,
+                            maxRadiusKm,
+                            message: 'The location is currently not serviceable'
+                        };
+                    }
+                    coords = this.currentLocation;
+                }
+            }
+        }
+
+        return this.isLocationServiceable(coords, maxRadiusKm);
     }
 
     // 4. Haversine Formula for Accurate Distance Calculation (in Km)
     calculateDistance(lat1, lon1, lat2, lon2) {
-        if (!lat1 || !lon1 || !lat2 || !lon2) return 1.0;
+        if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || typeof lat2 !== 'number' || typeof lon2 !== 'number' || isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) {
+            return 1.0;
+        }
         const R = 6371; // Earth radius in km
         const dLat = (lat2 - lat1) * (Math.PI / 180);
         const dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -455,8 +608,11 @@ export class GoogleMapsService {
         };
     }
 
-    // 6. Generate Real Google Maps Directions URL
+    // 6. Generate Real Google Maps Directions URL & Direct Search URL
     getDirectionsUrl(pharmacy) {
+        if (pharmacy.google_maps_url) {
+            return pharmacy.google_maps_url;
+        }
         const origin = `${this.currentLocation.lat},${this.currentLocation.lng}`;
         const destinationName = encodeURIComponent(`${pharmacy.shop_name} ${pharmacy.address}`);
         let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destinationName}`;
@@ -464,6 +620,12 @@ export class GoogleMapsService {
             url += `&destination_place_id=${pharmacy.place_id}`;
         }
         return url;
+    }
+
+    getGoogleMapsSearchUrl(lat, lng) {
+        const userLat = lat || this.currentLocation.lat;
+        const userLng = lng || this.currentLocation.lng;
+        return `https://www.google.com/maps/search/medical+store+pharmacy/@${userLat},${userLng},15z`;
     }
 
     // 7. Enable Watch Position for Real-Time Movement Updates
@@ -631,9 +793,8 @@ export class GoogleMapsService {
                             infoWindow.setContent(`
                                 <div style="color:#0f172a; padding:6px; font-family:sans-serif;">
                                     <strong style="font-size:14px;">${p.shop_name}</strong>
-                                    <div style="font-size:12px; color:#475569; margin:4px 0;">${p.address}</div>
                                     <div style="font-size:12px; margin-bottom:6px;">
-                                        ⭐ ${p.rating} (${p.reviews_count} reviews) • 📍 ${p.distance}
+                                        ⭐ ${p.rating} (${p.reviews_count} reviews)
                                     </div>
                                     <a href="${this.getDirectionsUrl(p)}" target="_blank" style="display:inline-block; background:#0ea5e9; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">
                                         🧭 Get Directions
@@ -645,6 +806,84 @@ export class GoogleMapsService {
                     }
                 });
                 return;
+            }
+        }
+
+        // If Leaflet maps API is available, render real Interactive Leaflet OpenStreetMap
+        if (typeof window.L !== 'undefined') {
+            try {
+                if (this.leafletMapInstances && this.leafletMapInstances[containerId]) {
+                    try { this.leafletMapInstances[containerId].remove(); } catch(e) {}
+                }
+                if (!this.leafletMapInstances) this.leafletMapInstances = {};
+
+                container.innerHTML = `<div id="${containerId}_lmap" style="width:100%; height:100%; min-height:220px; border-radius:var(--radius-md); overflow:hidden;"></div>`;
+                const mapEl = document.getElementById(`${containerId}_lmap`);
+                if (mapEl) {
+                    const lmap = L.map(mapEl, {
+                        center: [userLoc.lat, userLoc.lng],
+                        zoom: 13,
+                        zoomControl: true
+                    });
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(lmap);
+
+                    // User Location Blue Pulsing Marker
+                    const userIcon = L.divIcon({
+                        className: 'user-gps-leaflet-pin',
+                        html: `<div style="width:28px; height:28px; background:#0ea5e9; border:3px solid #ffffff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 0 12px rgba(14,165,233,0.8);">
+                            <i class="fa-solid fa-crosshairs" style="font-size:12px;"></i>
+                        </div>`,
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14]
+                    });
+                    L.marker([userLoc.lat, userLoc.lng], { icon: userIcon })
+                        .addTo(lmap)
+                        .bindPopup(`<b>📍 Your Location</b><br><small>${userLoc.label}</small>`);
+
+                    // Nearby Store Red Markers
+                    pharmacies.forEach(p => {
+                        if (p.lat && p.lng) {
+                            const storeIcon = L.divIcon({
+                                className: 'store-leaflet-pin',
+                                html: `<div style="width:28px; height:28px; background:${p.status === 'open' ? '#059669' : '#dc2626'}; border:2px solid #ffffff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+                                    <i class="fa-solid fa-store" style="font-size:12px;"></i>
+                                </div>`,
+                                iconSize: [28, 28],
+                                iconAnchor: [14, 14]
+                            });
+
+                            const popupHtml = `
+                                <div style="font-family:sans-serif; color:#0f172a; padding:4px; min-width:170px;">
+                                    <div style="font-weight:800; font-size:13px; margin-bottom:2px;">${p.shop_name}</div>
+                                    <div style="font-size:11px; color:#64748b; margin-bottom:4px;">${p.address}</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; margin-bottom:6px;">
+                                        <span>⭐ ${p.rating || 4.7}</span>
+                                        <span style="color:${p.status === 'open' ? '#059669' : '#dc2626'};">${p.status === 'open' ? '🟢 Open' : '🔴 Closed'}</span>
+                                        <span style="color:#0ea5e9;">⚡ ${p.distance || '0.8 km'}</span>
+                                    </div>
+                                    ${p.phone ? `<div style="font-size:11px; color:#475569; margin-bottom:6px;"><i class="fa-solid fa-phone"></i> ${p.phone}</div>` : ''}
+                                    <a href="${this.getDirectionsUrl(p)}" target="_blank" style="display:block; text-align:center; background:#0ea5e9; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">
+                                        🧭 Get Directions
+                                    </a>
+                                </div>
+                            `;
+
+                            L.marker([p.lat, p.lng], { icon: storeIcon })
+                                .addTo(lmap)
+                                .bindPopup(popupHtml);
+                        }
+                    });
+
+                    this.leafletMapInstances[containerId] = lmap;
+                    setTimeout(() => lmap.invalidateSize(), 250);
+                    return;
+                }
+            } catch(lErr) {
+                console.warn('[Leaflet Map Render Error]:', lErr);
             }
         }
 
@@ -686,13 +925,13 @@ export class GoogleMapsService {
         this.drawMarker(ctx, center.x, center.y, '#0284c7', 'fa-location-crosshairs', `🔵 You (${userLoc.label.split(',')[0]})`);
 
         // Draw Nearby Pharmacy Pins in relative spread
-        pharmacies.slice(0, 6).forEach((p, idx) => {
-            const angle = (idx / 6) * 2 * Math.PI;
-            const distPx = 50 + (idx * 15);
+        pharmacies.slice(0, 8).forEach((p, idx) => {
+            const angle = (idx / 8) * 2 * Math.PI;
+            const distPx = 45 + (idx * 12);
             const px = center.x + Math.cos(angle) * distPx;
             const py = center.y + Math.sin(angle) * distPx;
 
-            this.drawMarker(ctx, px, py, '#ef4444', 'fa-store', `📍 ${p.shop_name.split(' ')[0]} (${p.distance})`);
+            this.drawMarker(ctx, px, py, p.status === 'open' ? '#059669' : '#ef4444', 'fa-store', `📍 ${p.shop_name.split(' ')[0]}`);
         });
     }
 

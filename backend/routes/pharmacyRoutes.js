@@ -7,5 +7,7 @@ export const createPharmacyRoutes = (pharmCtrl) => {
     router.get('/', pharmCtrl.getAll);
     router.get('/:id', pharmCtrl.getById);
     router.post('/', pharmCtrl.create);
+    router.put('/:id', pharmCtrl.update);
+    router.delete('/:id', pharmCtrl.delete);
     return router;
 };

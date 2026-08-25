@@ -1,4 +1,5 @@
 // MediFind Prescription Controller (Upload, List, Approve/Reject Status Updates)
+import { PrescriptionMongo } from '../models/mongoSchemas.js';
 
 export const prescriptionController = (prescriptionStore) => ({
     getAll: (req, res) => {
@@ -15,12 +16,12 @@ export const prescriptionController = (prescriptionStore) => ({
         return res.json({ success: true, prescription: p });
     },
 
-    upload: (req, res) => {
+    upload: async (req, res) => {
         const { user_id, user_name, items, doctor_name } = req.body;
         const newPrescription = {
             id: `RX-${Math.floor(100 + Math.random() * 900)}`,
-            user_id: user_id || (req.user ? req.user.id : 'usr_1'),
-            user_name: user_name || 'Alex Johnson',
+            user_id: (req.user && req.user.id) ? req.user.id : (user_id || null),
+            user_name: (req.user && req.user.name) ? req.user.name : (user_name || 'Customer'),
             doctor_name: doctor_name || 'Dr. A. K. Sharma',
             status: 'Pending',
             created_at: new Date().toISOString(),
@@ -31,13 +32,24 @@ export const prescriptionController = (prescriptionStore) => ({
         };
 
         prescriptionStore.create(newPrescription);
+        try {
+            await PrescriptionMongo.create(newPrescription);
+        } catch (e) {
+            console.warn('[PrescriptionMongo Upload Error]:', e.message);
+        }
         return res.status(201).json({ success: true, message: 'Prescription uploaded for pharmacy verification', prescription: newPrescription });
     },
 
-    updateStatus: (req, res) => {
+    updateStatus: async (req, res) => {
         const { status } = req.body;
         const updated = prescriptionStore.updateStatus(req.params.id, status);
         if (!updated) return res.status(404).json({ success: false, message: 'Prescription not found' });
+
+        try {
+            await PrescriptionMongo.updateOne({ id: req.params.id }, { $set: { status } });
+        } catch (e) {
+            console.warn('[PrescriptionMongo Status Update Error]:', e.message);
+        }
         return res.json({ success: true, message: `Prescription status updated to ${status}`, prescription: updated });
     }
 });

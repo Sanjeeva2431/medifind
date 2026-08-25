@@ -9,5 +9,7 @@ export const createOrderRoutes = (orderCtrl) => {
     router.get('/:id', verifyToken, orderCtrl.getById);
     router.post('/', verifyToken, orderCtrl.create);
     router.put('/:id/status', verifyToken, orderCtrl.updateStatus);
+    router.patch('/:id/cancel', verifyToken, orderCtrl.cancel);
+    router.post('/reset', orderCtrl.resetOrders);
     return router;
 };

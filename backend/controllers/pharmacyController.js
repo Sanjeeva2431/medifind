@@ -1,4 +1,5 @@
 // MediFind Pharmacy Controller
+import { PharmacyMongo } from '../models/mongoSchemas.js';
 
 export const pharmacyController = (pharmacyStore) => ({
     getAll: (req, res) => {
@@ -12,7 +13,7 @@ export const pharmacyController = (pharmacyStore) => ({
         return res.json({ success: true, pharmacy });
     },
 
-    create: (req, res) => {
+    create: async (req, res) => {
         const { shop_name, owner_name, license_number, address, phone } = req.body;
         if (!shop_name || !license_number) {
             return res.status(400).json({ success: false, message: 'Shop name and license number required' });
@@ -36,6 +37,35 @@ export const pharmacyController = (pharmacyStore) => ({
         };
 
         pharmacyStore.create(newPharmacy);
+        try {
+            await PharmacyMongo.create(newPharmacy);
+        } catch (e) {
+            console.warn('[PharmacyMongo Create Error]:', e.message);
+        }
         return res.status(201).json({ success: true, message: 'Pharmacy registered successfully', pharmacy: newPharmacy });
+    },
+
+    update: async (req, res) => {
+        const updated = pharmacyStore.update(req.params.id, req.body);
+        if (!updated) return res.status(404).json({ success: false, message: 'Pharmacy not found' });
+
+        try {
+            await PharmacyMongo.updateOne({ id: req.params.id }, { $set: updated }, { upsert: true });
+        } catch (e) {
+            console.warn('[PharmacyMongo Update Error]:', e.message);
+        }
+        return res.json({ success: true, message: 'Pharmacy updated', pharmacy: updated });
+    },
+
+    delete: async (req, res) => {
+        const success = pharmacyStore.delete(req.params.id);
+        if (!success) return res.status(404).json({ success: false, message: 'Pharmacy not found' });
+
+        try {
+            await PharmacyMongo.deleteOne({ id: req.params.id });
+        } catch (e) {
+            console.warn('[PharmacyMongo Delete Error]:', e.message);
+        }
+        return res.json({ success: true, message: 'Pharmacy deleted' });
     }
 });

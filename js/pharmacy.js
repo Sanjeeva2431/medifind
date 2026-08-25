@@ -187,12 +187,12 @@ export class PharmacyModule {
                                     <td><span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${m.category}</span></td>
                                     <td>
                                         <div style="display:flex; align-items:center; gap:4px;">
-                                            ₹<input type="number" value="${m.price}" step="0.5" style="width:70px; padding:4px; border:1px solid var(--card-border); border-radius:4px; font-size:13px; font-weight:700;" onchange="MediApp.updatePrice('${m.id}', this.value)">
+                                            ₹<input type="number" value="${m.price}" step="0.5" style="width:70px; padding:4px; border:1px solid var(--card-border); border-radius:4px; font-size:13px; font-weight:700;" onchange="MediApp.updatePrice('${m.id}', this.value)" oninput="this.setAttribute('value', this.value)">
                                         </div>
                                     </td>
                                     <td>
                                         <div style="display:flex; align-items:center; gap:6px;">
-                                            <input type="number" value="${m.stock}" style="width:65px; padding:4px; border:1px solid ${m.stock < 20 ? 'var(--emergency-red)' : 'var(--card-border)'}; border-radius:4px; font-size:13px; font-weight:800; color:${m.stock < 20 ? 'var(--emergency-red)' : 'var(--text-main)'};" onchange="MediApp.updateStock('${m.id}', this.value)">
+                                            <input type="number" value="${m.stock}" style="width:65px; padding:4px; border:1px solid ${m.stock < 20 ? 'var(--emergency-red)' : 'var(--card-border)'}; border-radius:4px; font-size:13px; font-weight:800; color:${m.stock < 20 ? 'var(--emergency-red)' : 'var(--text-main)'};" onchange="MediApp.updateStock('${m.id}', this.value)" oninput="this.setAttribute('value', this.value)">
                                             <span style="font-size:11px; color:var(--text-muted);">units</span>
                                         </div>
                                     </td>
@@ -234,9 +234,19 @@ export class PharmacyModule {
                             <div style="background:var(--background); padding:12px; border-radius:var(--radius-sm); font-size:13px; margin-bottom:14px;">
                                 <strong>Order Items:</strong>
                                 <ul>
-                                    ${order.items.map(it => `<li>${it.quantity}x <b>${it.name}</b> — ₹${(it.price * it.quantity).toFixed(2)}</li>`).join('')}
+                                    ${(order.items || []).map(it => `<li>${it.quantity}x <b>${it.name}</b> — ₹${((it.price || 0) * (it.quantity || 1)).toFixed(2)}</li>`).join('')}
                                 </ul>
-                                <div style="margin-top:6px; text-align:right; font-weight:800; font-size:14px; color:var(--primary);">Total: ₹${order.total_amount.toFixed(2)}</div>
+                                ${(() => {
+                                    const items = order.items || [];
+                                    const itemsSum = items.reduce((sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 1), 0);
+                                    const deliveryFee = order.delivery_fee !== undefined ? order.delivery_fee : (itemsSum > 0 ? (itemsSum > 200 ? 0 : 25) : 0);
+                                    const tax = order.tax !== undefined ? order.tax : parseFloat((itemsSum * 0.05).toFixed(2));
+                                    const discount = order.discount || 0;
+                                    const computedTotal = parseFloat(Math.max(0, itemsSum + deliveryFee + tax - discount).toFixed(2));
+                                    const total = (order.total_amount && items.length > 0 && Math.abs(order.total_amount - computedTotal) < 0.05) ? order.total_amount : computedTotal;
+                                    order.total_amount = total;
+                                    return `<div style="margin-top:6px; text-align:right; font-weight:800; font-size:14px; color:var(--primary);">Total: ₹${total.toFixed(2)}</div>`;
+                                })()}
                             </div>
                             <div style="display:flex; gap:10px; justify-content:flex-end;">
                                 <button class="btn-secondary" onclick="MediApp.acceptOrder('${order.id}')"><i class="fa-solid fa-check"></i> Accept & Prepare</button>

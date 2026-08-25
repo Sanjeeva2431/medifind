@@ -27,3 +27,9 @@ Thumbs.db
 # Logs
 logs
 *.log
+
+# Temp scratch scripts
+scratch/
+selenium-tests/debug_*.js
+selenium-tests/test_*.js
+

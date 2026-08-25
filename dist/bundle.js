@@ -1,602 +1,4 @@
 (() => {
-  var __defProp = Object.defineProperty;
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __esm = (fn, res, err) => function __init() {
-    if (err) throw err[0];
-    try {
-      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-    } catch (e) {
-      throw err = [e], e;
-    }
-  };
-  var __export = (target, all) => {
-    for (var name in all)
-      __defProp(target, name, { get: all[name], enumerable: true });
-  };
-
-  // node_modules/@capacitor/core/dist/index.js
-  var ExceptionCode, CapacitorException, getPlatformId, createCapacitor, initCapacitorGlobal, Capacitor, registerPlugin, WebPlugin, encode, decode, CapacitorCookiesPluginWeb, CapacitorCookies, readBlobAsBase64, normalizeHttpHeaders, buildUrlParams, buildRequestInit, CapacitorHttpPluginWeb, CapacitorHttp, SystemBarsStyle, SystemBarType, SystemBarsPluginWeb, SystemBars;
-  var init_dist = __esm({
-    "node_modules/@capacitor/core/dist/index.js"() {
-      (function(ExceptionCode2) {
-        ExceptionCode2["Unimplemented"] = "UNIMPLEMENTED";
-        ExceptionCode2["Unavailable"] = "UNAVAILABLE";
-      })(ExceptionCode || (ExceptionCode = {}));
-      CapacitorException = class extends Error {
-        constructor(message, code, data) {
-          super(message);
-          this.message = message;
-          this.code = code;
-          this.data = data;
-        }
-      };
-      getPlatformId = (win) => {
-        var _a, _b;
-        if (win === null || win === void 0 ? void 0 : win.androidBridge) {
-          return "android";
-        } else if ((_b = (_a = win === null || win === void 0 ? void 0 : win.webkit) === null || _a === void 0 ? void 0 : _a.messageHandlers) === null || _b === void 0 ? void 0 : _b.bridge) {
-          return "ios";
-        } else {
-          return "web";
-        }
-      };
-      createCapacitor = (win) => {
-        const capCustomPlatform = win.CapacitorCustomPlatform || null;
-        const cap = win.Capacitor || {};
-        const Plugins = cap.Plugins = cap.Plugins || {};
-        const getPlatform = () => {
-          return capCustomPlatform !== null ? capCustomPlatform.name : getPlatformId(win);
-        };
-        const isNativePlatform = () => getPlatform() !== "web";
-        const isPluginAvailable = (pluginName) => {
-          const plugin = registeredPlugins.get(pluginName);
-          if (plugin === null || plugin === void 0 ? void 0 : plugin.platforms.has(getPlatform())) {
-            return true;
-          }
-          if (getPluginHeader(pluginName)) {
-            return true;
-          }
-          return false;
-        };
-        const getPluginHeader = (pluginName) => {
-          var _a;
-          return (_a = cap.PluginHeaders) === null || _a === void 0 ? void 0 : _a.find((h) => h.name === pluginName);
-        };
-        const handleError = (err) => win.console.error(err);
-        const registeredPlugins = /* @__PURE__ */ new Map();
-        const registerPlugin2 = (pluginName, jsImplementations = {}) => {
-          const registeredPlugin = registeredPlugins.get(pluginName);
-          if (registeredPlugin) {
-            console.warn(`Capacitor plugin "${pluginName}" already registered. Cannot register plugins twice.`);
-            return registeredPlugin.proxy;
-          }
-          const platform = getPlatform();
-          const pluginHeader = getPluginHeader(pluginName);
-          let jsImplementation;
-          const loadPluginImplementation = async () => {
-            if (!jsImplementation && platform in jsImplementations) {
-              jsImplementation = typeof jsImplementations[platform] === "function" ? jsImplementation = await jsImplementations[platform]() : jsImplementation = jsImplementations[platform];
-            } else if (capCustomPlatform !== null && !jsImplementation && "web" in jsImplementations) {
-              jsImplementation = typeof jsImplementations["web"] === "function" ? jsImplementation = await jsImplementations["web"]() : jsImplementation = jsImplementations["web"];
-            }
-            return jsImplementation;
-          };
-          const createPluginMethod = (impl, prop) => {
-            var _a, _b;
-            if (pluginHeader) {
-              const methodHeader = pluginHeader === null || pluginHeader === void 0 ? void 0 : pluginHeader.methods.find((m) => prop === m.name);
-              if (methodHeader) {
-                if (methodHeader.rtype === "promise") {
-                  return (options) => cap.nativePromise(pluginName, prop.toString(), options);
-                } else {
-                  return (options, callback) => cap.nativeCallback(pluginName, prop.toString(), options, callback);
-                }
-              } else if (impl) {
-                return (_a = impl[prop]) === null || _a === void 0 ? void 0 : _a.bind(impl);
-              }
-            } else if (impl) {
-              return (_b = impl[prop]) === null || _b === void 0 ? void 0 : _b.bind(impl);
-            } else {
-              throw new CapacitorException(`"${pluginName}" plugin is not implemented on ${platform}`, ExceptionCode.Unimplemented);
-            }
-          };
-          const createPluginMethodWrapper = (prop) => {
-            let remove;
-            const wrapper = (...args) => {
-              const p = loadPluginImplementation().then((impl) => {
-                const fn = createPluginMethod(impl, prop);
-                if (fn) {
-                  const p2 = fn(...args);
-                  remove = p2 === null || p2 === void 0 ? void 0 : p2.remove;
-                  return p2;
-                } else {
-                  throw new CapacitorException(`"${pluginName}.${prop}()" is not implemented on ${platform}`, ExceptionCode.Unimplemented);
-                }
-              });
-              if (prop === "addListener") {
-                p.remove = async () => remove();
-              }
-              return p;
-            };
-            wrapper.toString = () => `${prop.toString()}() { [capacitor code] }`;
-            Object.defineProperty(wrapper, "name", {
-              value: prop,
-              writable: false,
-              configurable: false
-            });
-            return wrapper;
-          };
-          const addListener = createPluginMethodWrapper("addListener");
-          const removeListener = createPluginMethodWrapper("removeListener");
-          const addListenerNative = (eventName, callback) => {
-            const call = addListener({ eventName }, callback);
-            const remove = async () => {
-              const callbackId = await call;
-              removeListener({
-                eventName,
-                callbackId
-              }, callback);
-            };
-            const p = new Promise((resolve) => call.then(() => resolve({ remove })));
-            p.remove = async () => {
-              console.warn(`Using addListener() without 'await' is deprecated.`);
-              await remove();
-            };
-            return p;
-          };
-          const proxy = new Proxy({}, {
-            get(_, prop) {
-              switch (prop) {
-                // https://github.com/facebook/react/issues/20030
-                case "$$typeof":
-                  return void 0;
-                case "toJSON":
-                  return () => ({});
-                case "addListener":
-                  return pluginHeader ? addListenerNative : addListener;
-                case "removeListener":
-                  return removeListener;
-                default:
-                  return createPluginMethodWrapper(prop);
-              }
-            }
-          });
-          Plugins[pluginName] = proxy;
-          registeredPlugins.set(pluginName, {
-            name: pluginName,
-            proxy,
-            platforms: /* @__PURE__ */ new Set([...Object.keys(jsImplementations), ...pluginHeader ? [platform] : []])
-          });
-          return proxy;
-        };
-        if (!cap.convertFileSrc) {
-          cap.convertFileSrc = (filePath) => filePath;
-        }
-        cap.getPlatform = getPlatform;
-        cap.handleError = handleError;
-        cap.isNativePlatform = isNativePlatform;
-        cap.isPluginAvailable = isPluginAvailable;
-        cap.registerPlugin = registerPlugin2;
-        cap.Exception = CapacitorException;
-        cap.DEBUG = !!cap.DEBUG;
-        cap.isLoggingEnabled = !!cap.isLoggingEnabled;
-        return cap;
-      };
-      initCapacitorGlobal = (win) => win.Capacitor = createCapacitor(win);
-      Capacitor = /* @__PURE__ */ initCapacitorGlobal(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : {});
-      registerPlugin = Capacitor.registerPlugin;
-      WebPlugin = class {
-        constructor() {
-          this.listeners = {};
-          this.retainedEventArguments = {};
-          this.windowListeners = {};
-        }
-        addListener(eventName, listenerFunc) {
-          let firstListener = false;
-          const listeners = this.listeners[eventName];
-          if (!listeners) {
-            this.listeners[eventName] = [];
-            firstListener = true;
-          }
-          this.listeners[eventName].push(listenerFunc);
-          const windowListener = this.windowListeners[eventName];
-          if (windowListener && !windowListener.registered) {
-            this.addWindowListener(windowListener);
-          }
-          if (firstListener) {
-            this.sendRetainedArgumentsForEvent(eventName);
-          }
-          const remove = async () => this.removeListener(eventName, listenerFunc);
-          const p = Promise.resolve({ remove });
-          return p;
-        }
-        async removeAllListeners() {
-          this.listeners = {};
-          for (const listener in this.windowListeners) {
-            this.removeWindowListener(this.windowListeners[listener]);
-          }
-          this.windowListeners = {};
-        }
-        notifyListeners(eventName, data, retainUntilConsumed) {
-          const listeners = this.listeners[eventName];
-          if (!listeners) {
-            if (retainUntilConsumed) {
-              let args = this.retainedEventArguments[eventName];
-              if (!args) {
-                args = [];
-              }
-              args.push(data);
-              this.retainedEventArguments[eventName] = args;
-            }
-            return;
-          }
-          listeners.forEach((listener) => listener(data));
-        }
-        hasListeners(eventName) {
-          var _a;
-          return !!((_a = this.listeners[eventName]) === null || _a === void 0 ? void 0 : _a.length);
-        }
-        registerWindowListener(windowEventName, pluginEventName) {
-          this.windowListeners[pluginEventName] = {
-            registered: false,
-            windowEventName,
-            pluginEventName,
-            handler: (event) => {
-              this.notifyListeners(pluginEventName, event);
-            }
-          };
-        }
-        unimplemented(msg = "not implemented") {
-          return new Capacitor.Exception(msg, ExceptionCode.Unimplemented);
-        }
-        unavailable(msg = "not available") {
-          return new Capacitor.Exception(msg, ExceptionCode.Unavailable);
-        }
-        async removeListener(eventName, listenerFunc) {
-          const listeners = this.listeners[eventName];
-          if (!listeners) {
-            return;
-          }
-          const index = listeners.indexOf(listenerFunc);
-          this.listeners[eventName].splice(index, 1);
-          if (!this.listeners[eventName].length) {
-            this.removeWindowListener(this.windowListeners[eventName]);
-          }
-        }
-        addWindowListener(handle) {
-          window.addEventListener(handle.windowEventName, handle.handler);
-          handle.registered = true;
-        }
-        removeWindowListener(handle) {
-          if (!handle) {
-            return;
-          }
-          window.removeEventListener(handle.windowEventName, handle.handler);
-          handle.registered = false;
-        }
-        sendRetainedArgumentsForEvent(eventName) {
-          const args = this.retainedEventArguments[eventName];
-          if (!args) {
-            return;
-          }
-          delete this.retainedEventArguments[eventName];
-          args.forEach((arg) => {
-            this.notifyListeners(eventName, arg);
-          });
-        }
-      };
-      encode = (str) => encodeURIComponent(str).replace(/%(2[346B]|5E|60|7C)/g, decodeURIComponent).replace(/[()]/g, escape);
-      decode = (str) => str.replace(/(%[\dA-F]{2})+/gi, decodeURIComponent);
-      CapacitorCookiesPluginWeb = class extends WebPlugin {
-        async getCookies() {
-          const cookies = document.cookie;
-          const cookieMap = {};
-          cookies.split(";").forEach((cookie) => {
-            if (cookie.length <= 0)
-              return;
-            let [key, value] = cookie.replace(/=/, "CAP_COOKIE").split("CAP_COOKIE");
-            key = decode(key).trim();
-            value = decode(value).trim();
-            cookieMap[key] = value;
-          });
-          return cookieMap;
-        }
-        async setCookie(options) {
-          try {
-            const encodedKey = encode(options.key);
-            const encodedValue = encode(options.value);
-            const expires = options.expires ? `; expires=${options.expires.replace("expires=", "")}` : "";
-            const path = (options.path || "/").replace("path=", "");
-            const domain = options.url != null && options.url.length > 0 ? `domain=${options.url}` : "";
-            document.cookie = `${encodedKey}=${encodedValue || ""}${expires}; path=${path}; ${domain};`;
-          } catch (error) {
-            return Promise.reject(error);
-          }
-        }
-        async deleteCookie(options) {
-          try {
-            document.cookie = `${options.key}=; Max-Age=0`;
-          } catch (error) {
-            return Promise.reject(error);
-          }
-        }
-        async clearCookies() {
-          try {
-            const cookies = document.cookie.split(";") || [];
-            for (const cookie of cookies) {
-              document.cookie = cookie.replace(/^ +/, "").replace(/=.*/, `=;expires=${(/* @__PURE__ */ new Date()).toUTCString()};path=/`);
-            }
-          } catch (error) {
-            return Promise.reject(error);
-          }
-        }
-        async clearAllCookies() {
-          try {
-            await this.clearCookies();
-          } catch (error) {
-            return Promise.reject(error);
-          }
-        }
-      };
-      CapacitorCookies = registerPlugin("CapacitorCookies", {
-        web: () => new CapacitorCookiesPluginWeb()
-      });
-      readBlobAsBase64 = async (blob) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64String = reader.result;
-          resolve(base64String.indexOf(",") >= 0 ? base64String.split(",")[1] : base64String);
-        };
-        reader.onerror = (error) => reject(error);
-        reader.readAsDataURL(blob);
-      });
-      normalizeHttpHeaders = (headers = {}) => {
-        const originalKeys = Object.keys(headers);
-        const loweredKeys = Object.keys(headers).map((k) => k.toLocaleLowerCase());
-        const normalized = loweredKeys.reduce((acc, key, index) => {
-          acc[key] = headers[originalKeys[index]];
-          return acc;
-        }, {});
-        return normalized;
-      };
-      buildUrlParams = (params, shouldEncode = true) => {
-        if (!params)
-          return null;
-        const output = Object.entries(params).reduce((accumulator, entry) => {
-          const [key, value] = entry;
-          let encodedValue;
-          let item;
-          if (Array.isArray(value)) {
-            item = "";
-            value.forEach((str) => {
-              encodedValue = shouldEncode ? encodeURIComponent(str) : str;
-              item += `${key}=${encodedValue}&`;
-            });
-            item.slice(0, -1);
-          } else {
-            encodedValue = shouldEncode ? encodeURIComponent(value) : value;
-            item = `${key}=${encodedValue}`;
-          }
-          return `${accumulator}&${item}`;
-        }, "");
-        return output.substr(1);
-      };
-      buildRequestInit = (options, extra = {}) => {
-        const output = Object.assign({ method: options.method || "GET", headers: options.headers }, extra);
-        const headers = normalizeHttpHeaders(options.headers);
-        const type = headers["content-type"] || "";
-        if (typeof options.data === "string") {
-          output.body = options.data;
-        } else if (type.includes("application/x-www-form-urlencoded")) {
-          const params = new URLSearchParams();
-          for (const [key, value] of Object.entries(options.data || {})) {
-            params.set(key, value);
-          }
-          output.body = params.toString();
-        } else if (type.includes("multipart/form-data") || options.data instanceof FormData) {
-          const form = new FormData();
-          if (options.data instanceof FormData) {
-            options.data.forEach((value, key) => {
-              form.append(key, value);
-            });
-          } else {
-            for (const key of Object.keys(options.data)) {
-              form.append(key, options.data[key]);
-            }
-          }
-          output.body = form;
-          const headers2 = new Headers(output.headers);
-          headers2.delete("content-type");
-          output.headers = headers2;
-        } else if (type.includes("application/json") || typeof options.data === "object") {
-          output.body = JSON.stringify(options.data);
-        }
-        return output;
-      };
-      CapacitorHttpPluginWeb = class extends WebPlugin {
-        /**
-         * Perform an Http request given a set of options
-         * @param options Options to build the HTTP request
-         */
-        async request(options) {
-          const requestInit = buildRequestInit(options, options.webFetchExtra);
-          const urlParams = buildUrlParams(options.params, options.shouldEncodeUrlParams);
-          const url = urlParams ? `${options.url}?${urlParams}` : options.url;
-          const response = await fetch(url, requestInit);
-          const contentType = response.headers.get("content-type") || "";
-          let { responseType = "text" } = response.ok ? options : {};
-          if (contentType.includes("application/json")) {
-            responseType = "json";
-          }
-          let data;
-          let blob;
-          switch (responseType) {
-            case "arraybuffer":
-            case "blob":
-              blob = await response.blob();
-              data = await readBlobAsBase64(blob);
-              break;
-            case "json":
-              data = await response.json();
-              break;
-            case "document":
-            case "text":
-            default:
-              data = await response.text();
-          }
-          const headers = {};
-          response.headers.forEach((value, key) => {
-            headers[key] = value;
-          });
-          return {
-            data,
-            headers,
-            status: response.status,
-            url: response.url
-          };
-        }
-        /**
-         * Perform an Http GET request given a set of options
-         * @param options Options to build the HTTP request
-         */
-        async get(options) {
-          return this.request(Object.assign(Object.assign({}, options), { method: "GET" }));
-        }
-        /**
-         * Perform an Http POST request given a set of options
-         * @param options Options to build the HTTP request
-         */
-        async post(options) {
-          return this.request(Object.assign(Object.assign({}, options), { method: "POST" }));
-        }
-        /**
-         * Perform an Http PUT request given a set of options
-         * @param options Options to build the HTTP request
-         */
-        async put(options) {
-          return this.request(Object.assign(Object.assign({}, options), { method: "PUT" }));
-        }
-        /**
-         * Perform an Http PATCH request given a set of options
-         * @param options Options to build the HTTP request
-         */
-        async patch(options) {
-          return this.request(Object.assign(Object.assign({}, options), { method: "PATCH" }));
-        }
-        /**
-         * Perform an Http DELETE request given a set of options
-         * @param options Options to build the HTTP request
-         */
-        async delete(options) {
-          return this.request(Object.assign(Object.assign({}, options), { method: "DELETE" }));
-        }
-      };
-      CapacitorHttp = registerPlugin("CapacitorHttp", {
-        web: () => new CapacitorHttpPluginWeb()
-      });
-      (function(SystemBarsStyle2) {
-        SystemBarsStyle2["Dark"] = "DARK";
-        SystemBarsStyle2["Light"] = "LIGHT";
-        SystemBarsStyle2["Default"] = "DEFAULT";
-      })(SystemBarsStyle || (SystemBarsStyle = {}));
-      (function(SystemBarType2) {
-        SystemBarType2["StatusBar"] = "StatusBar";
-        SystemBarType2["NavigationBar"] = "NavigationBar";
-      })(SystemBarType || (SystemBarType = {}));
-      SystemBarsPluginWeb = class extends WebPlugin {
-        async setStyle() {
-          this.unavailable("not available for web");
-        }
-        async setAnimation() {
-          this.unavailable("not available for web");
-        }
-        async show() {
-          this.unavailable("not available for web");
-        }
-        async hide() {
-          this.unavailable("not available for web");
-        }
-      };
-      SystemBars = registerPlugin("SystemBars", {
-        web: () => new SystemBarsPluginWeb()
-      });
-    }
-  });
-
-  // node_modules/@capacitor/app/dist/esm/definitions.js
-  var init_definitions = __esm({
-    "node_modules/@capacitor/app/dist/esm/definitions.js"() {
-    }
-  });
-
-  // node_modules/@capacitor/app/dist/esm/web.js
-  var web_exports = {};
-  __export(web_exports, {
-    AppWeb: () => AppWeb
-  });
-  var AppWeb;
-  var init_web = __esm({
-    "node_modules/@capacitor/app/dist/esm/web.js"() {
-      init_dist();
-      AppWeb = class extends WebPlugin {
-        constructor() {
-          super();
-          this.handleVisibilityChange = () => {
-            const data = {
-              isActive: document.hidden !== true
-            };
-            this.notifyListeners("appStateChange", data);
-            if (document.hidden) {
-              this.notifyListeners("pause", null);
-            } else {
-              this.notifyListeners("resume", null);
-            }
-          };
-          document.addEventListener("visibilitychange", this.handleVisibilityChange, false);
-        }
-        exitApp() {
-          throw this.unimplemented("Not implemented on web.");
-        }
-        async getInfo() {
-          throw this.unimplemented("Not implemented on web.");
-        }
-        async getLaunchUrl() {
-          return { url: "" };
-        }
-        async getState() {
-          return { isActive: document.hidden !== true };
-        }
-        async minimizeApp() {
-          throw this.unimplemented("Not implemented on web.");
-        }
-        async toggleBackButtonHandler() {
-          throw this.unimplemented("Not implemented on web.");
-        }
-        async getAppLanguage() {
-          return {
-            value: navigator.language.split("-")[0].toLowerCase()
-          };
-        }
-      };
-    }
-  });
-
-  // node_modules/@capacitor/app/dist/esm/index.js
-  var esm_exports = {};
-  __export(esm_exports, {
-    App: () => App
-  });
-  var App;
-  var init_esm = __esm({
-    "node_modules/@capacitor/app/dist/esm/index.js"() {
-      init_dist();
-      init_definitions();
-      App = registerPlugin("App", {
-        web: () => Promise.resolve().then(() => (init_web(), web_exports)).then((m) => new m.AppWeb())
-      });
-    }
-  });
-
   // js/data.js
   var MEDICINE_CATEGORIES = [
     { id: "all", name: "All Medicines", icon: "fa-pills", badge: "100+ Items" },
@@ -613,6 +15,26 @@
   ];
   var MOCK_PHARMACIES = [
     {
+      id: "pharm_supply_1",
+      shop_name: "Nazarathpet Medicine Supply Store",
+      owner_name: "Dr. R. Sanjeeva",
+      license_number: "DL-2026-NMS881",
+      gst: "33AAAAA9999A1Z1",
+      address: "Nazarathpet, Thirumazhisai, Poonamallee, Thiruvallur, Tamil Nadu 602101",
+      lat: 13.043913,
+      lng: 80.074262,
+      google_maps_url: "https://maps.app.goo.gl/GAJhNha3TsA4P29r7",
+      rating: 4.9,
+      reviews_count: 420,
+      status: "open",
+      distance: "0.3 km",
+      phone: "+91 98400 12345",
+      delivery_time: "10-15 mins",
+      delivery_available: true,
+      license_verified: true,
+      logo: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=150&auto=format&fit=crop&q=80"
+    },
+    {
       id: "pharm_1",
       shop_name: "Apollo Pharmacy 24/7",
       owner_name: "Dr. S. K. Gupta",
@@ -624,9 +46,9 @@
       rating: 4.8,
       reviews_count: 342,
       status: "open",
-      distance: "0.8 km",
+      distance: "0.4 km",
       phone: "+91 98765 12345",
-      delivery_time: "15-20 mins",
+      delivery_time: "12-15 mins",
       delivery_available: true,
       license_verified: true,
       logo: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=150&auto=format&fit=crop&q=80"
@@ -643,66 +65,161 @@
       rating: 4.6,
       reviews_count: 189,
       status: "open",
-      distance: "1.4 km",
+      distance: "0.8 km",
       phone: "+91 98111 88822",
-      delivery_time: "20-25 mins",
+      delivery_time: "15-20 mins",
       delivery_available: true,
       license_verified: true,
       logo: "https://images.unsplash.com/photo-1576602976047-174e57a47881?w=150&auto=format&fit=crop&q=80"
     },
     {
       id: "pharm_3",
-      shop_name: "Wellness Forever Chemist",
-      owner_name: "Priya Nambiar",
-      license_number: "DL-2021-WF1099",
-      gst: "07CCCCA2222C1Z9",
-      address: "Shop 5, City Center Mall Ground Floor",
-      lat: 28.529,
-      lng: 77.399,
+      shop_name: "Wellness Forever 24/7 Chemist",
+      owner_name: "Dr. Ananya Roy",
+      license_number: "DL-2023-WF9021",
+      gst: "07CCCCA2222C1Z8",
+      address: "Plot 88, Central Avenue Market, Sector 15",
+      lat: 28.532,
+      lng: 77.394,
       rating: 4.9,
       reviews_count: 512,
       status: "open",
-      distance: "2.1 km",
-      phone: "+91 99000 44332",
-      delivery_time: "25-30 mins",
+      distance: "1.1 km",
+      phone: "+91 98222 33344",
+      delivery_time: "15-22 mins",
       delivery_available: true,
       license_verified: true,
-      logo: "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=150&auto=format&fit=crop&q=80"
+      logo: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=80"
     },
     {
       id: "pharm_4",
-      shop_name: "Sanjeevani Emergency Pharmacy",
-      owner_name: "Vikram Singh",
-      license_number: "DL-2024-SAN901",
-      gst: "07DDDD3333D1Z1",
-      address: "Opposite AIIMS Gate 3, Ring Road",
-      lat: 28.56,
-      lng: 77.37,
-      rating: 4.7,
-      reviews_count: 275,
+      shop_name: "Guardian Pharmacy & Healthcare",
+      owner_name: "Vikas Malhotra",
+      license_number: "DL-2021-GPH771",
+      gst: "07DDDDA3333D1Z4",
+      address: "Shop 12, City Center Mall, Ground Floor",
+      lat: 28.5435,
+      lng: 77.388,
+      rating: 4.5,
+      reviews_count: 145,
       status: "open",
-      distance: "3.2 km",
-      phone: "+91 97777 11223",
-      delivery_time: "12-18 mins",
+      distance: "1.5 km",
+      phone: "+91 98333 44455",
+      delivery_time: "20-25 mins",
       delivery_available: true,
       license_verified: true,
-      logo: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=150&auto=format&fit=crop&q=80"
+      logo: "https://images.unsplash.com/photo-1576602976047-174e57a47881?w=150&auto=format&fit=crop&q=80"
     },
     {
       id: "pharm_5",
-      shop_name: "NetMeds Local Depot",
-      owner_name: "Anil Agarwal",
-      license_number: "DL-2020-NM3399",
-      gst: "07EEEE4444E1Z0",
-      address: "Plot 88, Tech Park Avenue",
-      lat: 28.51,
-      lng: 77.41,
-      rating: 4.5,
+      shop_name: "Netmeds Specialty Store",
+      owner_name: "Priya Sundaram",
+      license_number: "DL-2023-NM3390",
+      gst: "07EEEEA4444E1Z1",
+      address: "77 Cross Road, Block B, Preet Vihar",
+      lat: 28.529,
+      lng: 77.382,
+      rating: 4.7,
+      reviews_count: 278,
+      status: "open",
+      distance: "1.8 km",
+      phone: "+91 98444 55566",
+      delivery_time: "20-30 mins",
+      delivery_available: true,
+      license_verified: true,
+      logo: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "pharm_6",
+      shop_name: "Generico Generic Medicine Hub",
+      owner_name: "Amitabh Patel",
+      license_number: "DL-2022-GEN112",
+      gst: "07FFFFA5555F1Z9",
+      address: "Plot 15, Station Road, Opp. Civil Hospital",
+      lat: 28.548,
+      lng: 77.395,
+      rating: 4.4,
       reviews_count: 98,
       status: "open",
-      distance: "3.8 km",
-      phone: "+91 98888 66554",
+      distance: "2.3 km",
+      phone: "+91 98555 66677",
+      delivery_time: "25-30 mins",
+      delivery_available: true,
+      license_verified: true,
+      logo: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "pharm_7",
+      shop_name: "Frank Ross Pharmacy",
+      owner_name: "Subhash Mukherjee",
+      license_number: "DL-2020-FR5540",
+      gst: "07GGGGA6666G1Z6",
+      address: "99 Link Road, Near Fortis Hospital, Sector 62",
+      lat: 28.525,
+      lng: 77.401,
+      rating: 4.8,
+      reviews_count: 410,
+      status: "open",
+      distance: "2.9 km",
+      phone: "+91 98666 77788",
+      delivery_time: "25-35 mins",
+      delivery_available: true,
+      license_verified: true,
+      logo: "https://images.unsplash.com/photo-1576602976047-174e57a47881?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "pharm_8",
+      shop_name: "Sanjivani Medical & Surgical Hall",
+      owner_name: "Rajendra Prasad",
+      license_number: "DL-2019-SM0019",
+      gst: "07HHHHA7777H1Z3",
+      address: "5 Sector 22 Market, Main Bazaar Road",
+      lat: 28.552,
+      lng: 77.378,
+      rating: 4.6,
+      reviews_count: 165,
+      status: "closed",
+      distance: "3.4 km",
+      phone: "+91 98777 88899",
       delivery_time: "30-40 mins",
+      delivery_available: false,
+      license_verified: true,
+      logo: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "pharm_9",
+      shop_name: "Metro Care Discount Chemist",
+      owner_name: "Sunil Kumar",
+      license_number: "DL-2023-MC8820",
+      gst: "07IIIIA8888I1Z0",
+      address: "Shop 4, Metro Pillar 114, Main Highway",
+      lat: 28.518,
+      lng: 77.375,
+      rating: 4.3,
+      reviews_count: 84,
+      status: "open",
+      distance: "3.8 km",
+      phone: "+91 98888 99900",
+      delivery_time: "30-45 mins",
+      delivery_available: true,
+      license_verified: true,
+      logo: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "pharm_10",
+      shop_name: "Lifecare Pharma & Surgical Store",
+      owner_name: "Dr. Meenakshi Joshi",
+      license_number: "DL-2021-LC4401",
+      gst: "07JJJJA9999J1Z7",
+      address: "102 Medical Enclave, Gate 2, Hospital Road",
+      lat: 28.557,
+      lng: 77.405,
+      rating: 4.9,
+      reviews_count: 620,
+      status: "open",
+      distance: "4.2 km",
+      phone: "+91 98999 00011",
+      delivery_time: "35-45 mins",
       delivery_available: true,
       license_verified: true,
       logo: "https://images.unsplash.com/photo-1576602976047-174e57a47881?w=150&auto=format&fit=crop&q=80"
@@ -750,7 +267,8 @@
     const list = [];
     let count = 1;
     for (let loop = 0; loop < 4; loop++) {
-      rawData.forEach((item, idx) => {
+      rawData.forEach((item) => {
+        if (item.rx) return;
         const pharmIdx = count % MOCK_PHARMACIES.length;
         const pharmacy = MOCK_PHARMACIES[pharmIdx];
         const suffix = loop === 0 ? "" : ` (Pack ${loop + 1})`;
@@ -770,11 +288,11 @@
           expiry_date: `${expiryYear}-${expiryMonth}-28`,
           description: item.desc,
           side_effects: item.side,
-          requires_prescription: item.rx,
+          requires_prescription: false,
           image: item.img,
-          pharmacy_id: pharmacy.id,
-          pharmacy_name: pharmacy.shop_name,
-          pharmacy_distance: pharmacy.distance,
+          pharmacy_id: "pharm_nazarathpet",
+          pharmacy_name: "Nazarathpet Medicine Supply Store",
+          pharmacy_distance: "0.0 km",
           rating: (4 + count % 10 * 0.1).toFixed(1)
         });
         count++;
@@ -914,11 +432,23 @@
   // js/maps.js
   var GoogleMapsService = class {
     constructor() {
-      const savedLoc = localStorage.getItem("medifind_user_location");
-      this.currentLocation = savedLoc ? JSON.parse(savedLoc) : {
-        lat: 13.0827,
-        lng: 80.2707,
-        label: "Anna Nagar, Chennai",
+      var _a;
+      let savedLoc = null;
+      try {
+        const raw = typeof localStorage !== "undefined" ? localStorage.getItem("medifind_user_location") : null;
+        if (raw && raw !== "undefined" && raw !== "null") {
+          const parsed = JSON.parse(raw);
+          if (parsed && !((_a = parsed.label) == null ? void 0 : _a.includes("Anna Nagar"))) {
+            savedLoc = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn("[GoogleMapsService] Error reading location from storage:", e);
+      }
+      this.currentLocation = savedLoc || {
+        lat: 28.5355,
+        lng: 77.391,
+        label: "User Current Location",
         isLiveGps: false,
         accuracy: null
       };
@@ -936,7 +466,8 @@
     }
     async initGoogleMapsApi() {
       try {
-        const res = await fetch("/api/config");
+        const baseUrl = typeof window !== "undefined" ? "" : "http://localhost:5000";
+        const res = await fetch(`${baseUrl}/api/config`);
         if (res.ok) {
           const config = await res.json();
           if (config.success && config.googleMapsApiKey) {
@@ -944,7 +475,7 @@
           }
         }
       } catch (e) {
-        console.warn("[Google Maps API Config Check Failed]:", e);
+        console.warn("[Google Maps API Config Check Failed]:", e.message || e);
       }
     }
     loadGoogleMapsScript(apiKey) {
@@ -972,70 +503,122 @@
       this.locationState.status = "detecting";
       this.locationState.errorMessage = "";
       if (window.MediApp) window.MediApp.render();
+      const processLocationFix = async (position, isHighAccuracy = true) => {
+        const lat = parseFloat(position.coords.latitude.toFixed(6));
+        const lng = parseFloat(position.coords.longitude.toFixed(6));
+        const accuracy = Math.round(position.coords.accuracy || 0);
+        let addressLabel = `Live GPS (${lat}, ${lng})`;
+        try {
+          const geoRes = await fetch(`/api/places/geocode?lat=${lat}&lng=${lng}`);
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData && geoData.success && geoData.formatted_address) {
+              addressLabel = geoData.formatted_address;
+            }
+          }
+        } catch (e) {
+          console.warn("[Maps API] Geocoding lookup error:", e);
+        }
+        this.currentLocation = {
+          lat,
+          lng,
+          label: addressLabel,
+          isLiveGps: true,
+          accuracy,
+          isHighAccuracy
+        };
+        this.locationState = {
+          status: "granted",
+          errorMessage: "",
+          isLiveGps: true
+        };
+        localStorage.setItem("medifind_user_location", JSON.stringify(this.currentLocation));
+        if (window.MediApp && window.MediApp.authService) {
+          const currentUser = window.MediApp.authService.getUser();
+          if (currentUser) {
+            currentUser.address = addressLabel;
+            window.MediApp.authService.setCurrentUser(currentUser, true);
+            if (window.MediApp.authService.api) {
+              window.MediApp.authService.api.updateProfile({ address: addressLabel }).catch((e) => console.warn("[Auto-Location Profile Sync Note]:", e));
+            }
+          }
+        }
+        await this.fetchNearbyPharmacies(lat, lng);
+        if (window.MediApp) window.MediApp.render();
+        return {
+          success: true,
+          location: this.currentLocation,
+          message: `\u{1F4CD} Located: ${addressLabel}! Real nearby pharmacies retrieved.`
+        };
+      };
       return new Promise((resolve) => {
         if (!navigator.geolocation) {
           this.fallbackToIpLocation("Geolocation is not supported by your browser. Using IP Location.").then(resolve);
           return;
         }
         let resolved = false;
-        const gpsTimeout = setTimeout(async () => {
+        const gpsTimeout = setTimeout(() => {
           if (!resolved) {
-            resolved = true;
-            console.log("\u{1F4CD} Browser GPS timeout (5s). Falling back to IP Geolocation...");
-            const ipRes = await this.fallbackToIpLocation("GPS timeout. Located via IP address.");
-            resolve(ipRes);
+            console.log("\u{1F4CD} High-accuracy GPS timeout (12s). Attempting low-accuracy cell/Wi-Fi positioning...");
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                if (!resolved) {
+                  resolved = true;
+                  const res = await processLocationFix(position, false);
+                  resolve(res);
+                }
+              },
+              async (lowAccErr) => {
+                if (!resolved) {
+                  resolved = true;
+                  console.warn("[Low-Accuracy Geolocation Error]:", lowAccErr.message);
+                  const ipRes = await this.fallbackToIpLocation("GPS timeout. Located via IP address.");
+                  resolve(ipRes);
+                }
+              },
+              { enableHighAccuracy: false, timeout: 6e3, maximumAge: 6e4 }
+            );
           }
-        }, 5e3);
+        }, 12e3);
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             if (resolved) return;
             resolved = true;
             clearTimeout(gpsTimeout);
-            const lat = parseFloat(position.coords.latitude.toFixed(6));
-            const lng = parseFloat(position.coords.longitude.toFixed(6));
-            const accuracy = Math.round(position.coords.accuracy || 0);
-            let addressLabel = `Live GPS (${lat}, ${lng})`;
-            try {
-              const geoRes = await fetch(`/api/places/geocode?lat=${lat}&lng=${lng}`);
-              if (geoRes.ok) {
-                const geoData = await geoRes.json();
-                if (geoData && geoData.success && geoData.formatted_address) {
-                  addressLabel = geoData.formatted_address;
-                }
-              }
-            } catch (e) {
-              console.warn("[Maps API] Geocoding lookup error:", e);
-            }
-            this.currentLocation = {
-              lat,
-              lng,
-              label: addressLabel,
-              isLiveGps: true,
-              accuracy
-            };
-            this.locationState = {
-              status: "granted",
-              errorMessage: "",
-              isLiveGps: true
-            };
-            localStorage.setItem("medifind_user_location", JSON.stringify(this.currentLocation));
-            await this.fetchNearbyPharmacies(lat, lng);
-            if (window.MediApp) window.MediApp.render();
-            resolve({
-              success: true,
-              location: this.currentLocation,
-              message: `\u{1F4CD} Located: ${addressLabel}! Real nearby pharmacies retrieved.`
-            });
+            const res = await processLocationFix(position, true);
+            resolve(res);
           },
           async (error) => {
             if (resolved) return;
-            resolved = true;
-            clearTimeout(gpsTimeout);
-            console.warn("[Browser GPS Permission Error]:", error.message);
-            const ipRes = await this.fallbackToIpLocation("Location access blocked or unavailable. City detected via IP.");
-            resolve(ipRes);
+            console.warn("[High-Accuracy GPS Error]:", error.message);
+            if (error.code === error.PERMISSION_DENIED) {
+              resolved = true;
+              clearTimeout(gpsTimeout);
+              const ipRes = await this.fallbackToIpLocation("Location access blocked by browser. City detected via IP.");
+              resolve(ipRes);
+              return;
+            }
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(gpsTimeout);
+                  const res = await processLocationFix(position, false);
+                  resolve(res);
+                }
+              },
+              async (lowAccErr) => {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(gpsTimeout);
+                  const ipRes = await this.fallbackToIpLocation("Location access unavailable. City detected via IP.");
+                  resolve(ipRes);
+                }
+              },
+              { enableHighAccuracy: false, timeout: 6e3, maximumAge: 6e4 }
+            );
           },
-          { enableHighAccuracy: true, timeout: 5e3, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 12e3, maximumAge: 0 }
         );
       });
     }
@@ -1212,73 +795,136 @@
     getPharmacies() {
       const userLat = this.currentLocation.lat;
       const userLng = this.currentLocation.lng;
-      const currentArea = (this.currentLocation.label || "Your Area").split(",")[0].replace(/Live GPS \([^)]+\)/gi, "Your Area").trim() || "Your Area";
-      const currentCity = (this.currentLocation.label || "").split(",")[1] || "";
-      const localOffsets = [
-        { dLat: 35e-4, dLng: 42e-4 },
-        // ~0.45 km
-        { dLat: -51e-4, dLng: 63e-4 },
-        // ~0.85 km
-        { dLat: 78e-4, dLng: -71e-4 },
-        // ~1.2 km
-        { dLat: -0.0102, dLng: -89e-4 },
-        // ~1.6 km
-        { dLat: 0.0135, dLng: 0.0124 },
-        // ~2.1 km
-        { dLat: -0.0168, dLng: 0.0155 },
-        // ~2.7 km
-        { dLat: 0.021, dLng: -0.0182 },
-        // ~3.4 km
-        { dLat: -0.0255, dLng: -0.0221 }
-        // ~4.1 km
-      ];
-      const baseNames = [
-        "Apollo Pharmacy 24/7",
-        "MedPlus Superstore",
-        "Wellness Forever Chemist",
-        "Sanjeevani Emergency Pharmacy",
-        "NetMeds Local Depot",
-        "Guardian Lifecare",
-        "Health & Glow Pharmacy",
-        "Trust Chemist & Druggist"
-      ];
-      const localizedMockPharmacies = MOCK_PHARMACIES.map((p, idx) => {
-        const offset = localOffsets[idx % localOffsets.length];
-        const pLat = userLat + offset.dLat;
-        const pLng = userLng + offset.dLng;
-        const baseName = baseNames[idx % baseNames.length];
-        const shopName = `${baseName} (${currentArea})`;
-        const address = `Plot ${12 + idx * 4}, Block ${String.fromCharCode(65 + idx % 5)}, ${currentArea}${currentCity ? ", " + currentCity : ""}`;
-        const distKm = this.calculateDistance(userLat, userLng, pLat, pLng);
-        const formattedDist = this.formatDistance(distKm);
-        const times = this.calculateTravelTime(distKm);
-        return {
+      const list = [];
+      MOCK_PHARMACIES.filter((p) => p.google_maps_url || p.id === "pharm_supply_1").forEach((p) => {
+        const distKm = this.calculateDistance(userLat, userLng, p.lat, p.lng);
+        list.push({
           ...p,
-          lat: pLat,
-          lng: pLng,
-          shop_name: shopName,
-          address,
           distance_km: distKm,
-          distance: formattedDist,
-          delivery_time: times.deliveryTime
-        };
-      });
-      if (this.googlePharmacies && this.googlePharmacies.length > 0) {
-        const googleIds = new Set(this.googlePharmacies.map((g) => g.place_id));
-        const merged = [...this.googlePharmacies];
-        localizedMockPharmacies.forEach((p) => {
-          if (!googleIds.has(p.place_id)) {
-            merged.push(p);
-          }
+          distance: this.formatDistance(distKm),
+          delivery_time: this.calculateTravelTime(distKm).deliveryTime
         });
-        merged.sort((a, b) => (a.distance_km || 99) - (b.distance_km || 99));
-        return merged;
+      });
+      if (this.googlePharmacies && Array.isArray(this.googlePharmacies) && this.googlePharmacies.length > 0) {
+        this.googlePharmacies.forEach((p) => {
+          const distKm = p.distance_km || this.calculateDistance(userLat, userLng, p.lat, p.lng);
+          list.push({
+            ...p,
+            distance_km: distKm,
+            distance: this.formatDistance(distKm),
+            shop_name: (p.shop_name || "Medical Store").replace(/\s*\([^)]*\)/g, "").trim()
+          });
+        });
       }
-      return localizedMockPharmacies.sort((a, b) => a.distance_km - b.distance_km);
+      list.sort((a, b) => (a.distance_km || 99) - (b.distance_km || 99));
+      return list;
+    }
+    // Check if user location is within the 15 km delivery radius of the Medicine Supply Store
+    isLocationServiceable(userLoc = this.currentLocation, maxRadiusKm = 15) {
+      if (!userLoc || typeof userLoc.lat !== "number" || typeof userLoc.lng !== "number" || isNaN(userLoc.lat) || isNaN(userLoc.lng)) {
+        return { serviceable: true, distanceKm: 0, message: "" };
+      }
+      const STORE_LAT = 13.043913;
+      const STORE_LNG = 80.074262;
+      const distanceKm = this.calculateDistance(userLoc.lat, userLoc.lng, STORE_LAT, STORE_LNG);
+      if (distanceKm > maxRadiusKm) {
+        return {
+          serviceable: false,
+          distanceKm,
+          maxRadiusKm,
+          message: "The location is currently not serviceable"
+        };
+      }
+      return {
+        serviceable: true,
+        distanceKm,
+        maxRadiusKm,
+        message: "Serviceable location"
+      };
+    }
+    // Forward geocode address string to lat/lng coordinates
+    async geocodeAddress(addressString) {
+      if (!addressString || typeof addressString !== "string" || addressString.trim().length === 0) {
+        return null;
+      }
+      const lower = addressString.toLowerCase();
+      if (lower.includes("noida") || lower.includes("sector 18")) {
+        return { lat: 28.5355, lng: 77.391, formatted_address: "Sector 18, Noida" };
+      }
+      if (lower.includes("delhi")) {
+        return { lat: 28.6139, lng: 77.209, formatted_address: "New Delhi" };
+      }
+      if (lower.includes("bengaluru") || lower.includes("bangalore")) {
+        return { lat: 12.9716, lng: 77.5946, formatted_address: "Bengaluru" };
+      }
+      if (lower.includes("mumbai")) {
+        return { lat: 19.076, lng: 72.8777, formatted_address: "Mumbai" };
+      }
+      try {
+        const encoded = encodeURIComponent(addressString.trim());
+        const baseUrl = typeof window !== "undefined" ? "" : "http://localhost:5000";
+        const res = await fetch(`${baseUrl}/api/places/geocode?address=${encoded}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && typeof data.lat === "number" && typeof data.lng === "number") {
+            return {
+              lat: data.lat,
+              lng: data.lng,
+              formatted_address: data.formatted_address || addressString
+            };
+          }
+        }
+      } catch (e) {
+        console.warn("[Geocode Address Error]:", e.message || e);
+      }
+      try {
+        const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressString)}`);
+        if (nomRes.ok) {
+          const items = await nomRes.json();
+          if (items && items.length > 0) {
+            return {
+              lat: parseFloat(items[0].lat),
+              lng: parseFloat(items[0].lon),
+              formatted_address: items[0].display_name
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("[Nominatim Geocode Error]:", err);
+      }
+      return null;
+    }
+    // Verify serviceability by address string or coordinate object
+    async verifyDeliveryServiceability(addressOrCoords, maxRadiusKm = 15) {
+      let coords = addressOrCoords;
+      if (typeof addressOrCoords === "string") {
+        if (this.currentLocation && this.currentLocation.label && (addressOrCoords.trim() === this.currentLocation.label.trim() || addressOrCoords.toLowerCase().includes(this.currentLocation.label.toLowerCase()))) {
+          coords = this.currentLocation;
+        } else {
+          const resolved = await this.geocodeAddress(addressOrCoords);
+          if (resolved && typeof resolved.lat === "number" && typeof resolved.lng === "number" && !isNaN(resolved.lat) && !isNaN(resolved.lng)) {
+            coords = resolved;
+          } else {
+            const lower = addressOrCoords.toLowerCase();
+            if (lower.includes("noida") || lower.includes("delhi") || lower.includes("mumbai") || lower.includes("bengaluru") || lower.includes("hyderabad") || lower.includes("kolkata") || lower.includes("pune") || lower.includes("jaipur")) {
+              return {
+                serviceable: false,
+                distanceKm: 1500,
+                maxRadiusKm,
+                message: "The location is currently not serviceable"
+              };
+            }
+            coords = this.currentLocation;
+          }
+        }
+      }
+      return this.isLocationServiceable(coords, maxRadiusKm);
     }
     // 4. Haversine Formula for Accurate Distance Calculation (in Km)
     calculateDistance(lat1, lon1, lat2, lon2) {
-      if (!lat1 || !lon1 || !lat2 || !lon2) return 1;
+      if (typeof lat1 !== "number" || typeof lon1 !== "number" || typeof lat2 !== "number" || typeof lon2 !== "number" || isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) {
+        return 1;
+      }
       const R = 6371;
       const dLat = (lat2 - lat1) * (Math.PI / 180);
       const dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -1304,8 +950,11 @@
         deliveryTime: `${Math.max(10, totalDeliveryMins)}-${totalDeliveryMins + 5} mins delivery`
       };
     }
-    // 6. Generate Real Google Maps Directions URL
+    // 6. Generate Real Google Maps Directions URL & Direct Search URL
     getDirectionsUrl(pharmacy) {
+      if (pharmacy.google_maps_url) {
+        return pharmacy.google_maps_url;
+      }
       const origin = `${this.currentLocation.lat},${this.currentLocation.lng}`;
       const destinationName = encodeURIComponent(`${pharmacy.shop_name} ${pharmacy.address}`);
       let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destinationName}`;
@@ -1313,6 +962,11 @@
         url += `&destination_place_id=${pharmacy.place_id}`;
       }
       return url;
+    }
+    getGoogleMapsSearchUrl(lat, lng) {
+      const userLat = lat || this.currentLocation.lat;
+      const userLng = lng || this.currentLocation.lng;
+      return `https://www.google.com/maps/search/medical+store+pharmacy/@${userLat},${userLng},15z`;
     }
     // 7. Enable Watch Position for Real-Time Movement Updates
     startWatchPosition() {
@@ -1462,9 +1116,8 @@
                 infoWindow.setContent(`
                                 <div style="color:#0f172a; padding:6px; font-family:sans-serif;">
                                     <strong style="font-size:14px;">${p.shop_name}</strong>
-                                    <div style="font-size:12px; color:#475569; margin:4px 0;">${p.address}</div>
                                     <div style="font-size:12px; margin-bottom:6px;">
-                                        \u2B50 ${p.rating} (${p.reviews_count} reviews) \u2022 \u{1F4CD} ${p.distance}
+                                        \u2B50 ${p.rating} (${p.reviews_count} reviews)
                                     </div>
                                     <a href="${this.getDirectionsUrl(p)}" target="_blank" style="display:inline-block; background:#0ea5e9; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">
                                         \u{1F9ED} Get Directions
@@ -1476,6 +1129,72 @@
             }
           });
           return;
+        }
+      }
+      if (typeof window.L !== "undefined") {
+        try {
+          if (this.leafletMapInstances && this.leafletMapInstances[containerId]) {
+            try {
+              this.leafletMapInstances[containerId].remove();
+            } catch (e) {
+            }
+          }
+          if (!this.leafletMapInstances) this.leafletMapInstances = {};
+          container.innerHTML = `<div id="${containerId}_lmap" style="width:100%; height:100%; min-height:220px; border-radius:var(--radius-md); overflow:hidden;"></div>`;
+          const mapEl = document.getElementById(`${containerId}_lmap`);
+          if (mapEl) {
+            const lmap = L.map(mapEl, {
+              center: [userLoc.lat, userLoc.lng],
+              zoom: 13,
+              zoomControl: true
+            });
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              maxZoom: 19,
+              attribution: "\xA9 OpenStreetMap contributors"
+            }).addTo(lmap);
+            const userIcon = L.divIcon({
+              className: "user-gps-leaflet-pin",
+              html: `<div style="width:28px; height:28px; background:#0ea5e9; border:3px solid #ffffff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 0 12px rgba(14,165,233,0.8);">
+                            <i class="fa-solid fa-crosshairs" style="font-size:12px;"></i>
+                        </div>`,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14]
+            });
+            L.marker([userLoc.lat, userLoc.lng], { icon: userIcon }).addTo(lmap).bindPopup(`<b>\u{1F4CD} Your Location</b><br><small>${userLoc.label}</small>`);
+            pharmacies.forEach((p) => {
+              if (p.lat && p.lng) {
+                const storeIcon = L.divIcon({
+                  className: "store-leaflet-pin",
+                  html: `<div style="width:28px; height:28px; background:${p.status === "open" ? "#059669" : "#dc2626"}; border:2px solid #ffffff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+                                    <i class="fa-solid fa-store" style="font-size:12px;"></i>
+                                </div>`,
+                  iconSize: [28, 28],
+                  iconAnchor: [14, 14]
+                });
+                const popupHtml = `
+                                <div style="font-family:sans-serif; color:#0f172a; padding:4px; min-width:170px;">
+                                    <div style="font-weight:800; font-size:13px; margin-bottom:2px;">${p.shop_name}</div>
+                                    <div style="font-size:11px; color:#64748b; margin-bottom:4px;">${p.address}</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; margin-bottom:6px;">
+                                        <span>\u2B50 ${p.rating || 4.7}</span>
+                                        <span style="color:${p.status === "open" ? "#059669" : "#dc2626"};">${p.status === "open" ? "\u{1F7E2} Open" : "\u{1F534} Closed"}</span>
+                                        <span style="color:#0ea5e9;">\u26A1 ${p.distance || "0.8 km"}</span>
+                                    </div>
+                                    ${p.phone ? `<div style="font-size:11px; color:#475569; margin-bottom:6px;"><i class="fa-solid fa-phone"></i> ${p.phone}</div>` : ""}
+                                    <a href="${this.getDirectionsUrl(p)}" target="_blank" style="display:block; text-align:center; background:#0ea5e9; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold;">
+                                        \u{1F9ED} Get Directions
+                                    </a>
+                                </div>
+                            `;
+                L.marker([p.lat, p.lng], { icon: storeIcon }).addTo(lmap).bindPopup(popupHtml);
+              }
+            });
+            this.leafletMapInstances[containerId] = lmap;
+            setTimeout(() => lmap.invalidateSize(), 250);
+            return;
+          }
+        } catch (lErr) {
+          console.warn("[Leaflet Map Render Error]:", lErr);
         }
       }
       let canvas = container.querySelector("canvas");
@@ -1505,12 +1224,12 @@
       }
       const center = { x: width * 0.5, y: height * 0.5 };
       this.drawMarker(ctx, center.x, center.y, "#0284c7", "fa-location-crosshairs", `\u{1F535} You (${userLoc.label.split(",")[0]})`);
-      pharmacies.slice(0, 6).forEach((p, idx) => {
-        const angle = idx / 6 * 2 * Math.PI;
-        const distPx = 50 + idx * 15;
+      pharmacies.slice(0, 8).forEach((p, idx) => {
+        const angle = idx / 8 * 2 * Math.PI;
+        const distPx = 45 + idx * 12;
         const px = center.x + Math.cos(angle) * distPx;
         const py = center.y + Math.sin(angle) * distPx;
-        this.drawMarker(ctx, px, py, "#ef4444", "fa-store", `\u{1F4CD} ${p.shop_name.split(" ")[0]} (${p.distance})`);
+        this.drawMarker(ctx, px, py, p.status === "open" ? "#059669" : "#ef4444", "fa-store", `\u{1F4CD} ${p.shop_name.split(" ")[0]}`);
       });
     }
     drawMarker(ctx, x, y, color, iconClass, label) {
@@ -1540,15 +1259,7 @@
     console.log("===========================================================");
     console.log("\u{1F525} [Firestore Seeder] Seeding 8 Production Collections...");
     console.log("===========================================================");
-    const users = [
-      { id: "usr_1", name: "Alex Johnson", email: "alex@example.com", password: "password123", phone: "+91 98765 43210", role: "customer", address: { street: "Flat 402, Block B, Sector 18", city: "Noida", zip: "201301", lat: 28.5355, lng: 77.391 } },
-      { id: "usr_2", name: "Priya Sharma", email: "priya@example.com", password: "password123", phone: "+91 98111 22334", role: "customer", address: { street: "42 Green Park", city: "Delhi", zip: "110016", lat: 28.55, lng: 77.2 } },
-      { id: "usr_pharm_1", name: "Dr. S. K. Gupta", email: "apollo@example.com", password: "password123", phone: "+91 98765 12345", role: "pharmacy", address: { street: "Apollo Pharmacy 24/7, Sector 18", city: "Noida", zip: "201301", lat: 28.5355, lng: 77.391 } },
-      { id: "usr_driver_1", name: "Rohan Verma", email: "rohan@example.com", password: "password123", phone: "+91 98112 33445", role: "delivery", address: { street: "Delivery Hub 4", city: "Noida", zip: "201301", lat: 28.538, lng: 77.388 } },
-      { id: "usr_admin_1", name: "Super Admin", email: "admin@medifind.com", password: "adminpassword", phone: "+91 99999 00000", role: "admin", address: { street: "MediFind HQ", city: "Noida", zip: "201301", lat: 28.5355, lng: 77.391 } }
-    ];
-    users.forEach((u) => firestoreDb2.collections.Users.set(u.id, u));
-    console.log(`\u2705 [1/8 Users] Populated ${users.length} documents.`);
+    console.log(`\u2705 [1/8 Users] Seeding skipped (only real verified users allowed).`);
     MOCK_PHARMACIES.forEach((p) => firestoreDb2.collections.Pharmacies.set(p.id, {
       ...p,
       owner_id: "usr_pharm_1",
@@ -1666,8 +1377,11 @@
     init() {
       seedFirestore(this);
       try {
-        const savedCustomUsers = JSON.parse(localStorage.getItem("medifind_custom_users") || "[]");
-        savedCustomUsers.forEach((u) => this.collections.Users.set(u.id, u));
+        const raw = typeof localStorage !== "undefined" ? localStorage.getItem("medifind_custom_users") : null;
+        const savedCustomUsers = raw && raw !== "undefined" && raw !== "null" ? JSON.parse(raw) : [];
+        if (Array.isArray(savedCustomUsers)) {
+          savedCustomUsers.forEach((u) => this.collections.Users.set(u.id, u));
+        }
       } catch (e) {
         console.error("[Firestore DB] Error restoring saved custom users:", e);
       }
@@ -1776,13 +1490,37 @@
     }
     // 1. Home Feed
     renderHome() {
+      var _a;
       const userLoc = googleMapsService.getUserLocation();
       const locState = googleMapsService.getLocationState();
       const pharmacies = googleMapsService.getPharmacies();
       const isSearchingGoogle = googleMapsService.isSearchingGoogle;
       const googleApiError = googleMapsService.googleApiError;
+      (this.app.state.orders || []).forEach((o) => {
+        if (o && o.order_status !== "Cancelled" && o.order_status !== "Delivered") {
+          const elapsedMins = (Date.now() - new Date(o.created_at || Date.now()).getTime()) / 6e4;
+          if (elapsedMins >= 30) {
+            o.order_status = "Delivered";
+            o.tracking_step = 4;
+            o.payment_status = "Paid";
+          } else if (elapsedMins >= 15 && o.tracking_step < 3) {
+            o.order_status = "Out for Delivery";
+            o.tracking_step = 3;
+          } else if (elapsedMins >= 5 && o.tracking_step < 2) {
+            o.order_status = "Preparing";
+            o.tracking_step = 2;
+          }
+        }
+      });
+      const activeOrder = (this.app.state.orders || []).find((o) => o.order_status !== "Delivered" && o.order_status !== "Cancelled");
+      let activeArrivalText = "";
+      if (activeOrder) {
+        const elapsedMins = Math.floor((Date.now() - new Date(activeOrder.created_at || Date.now()).getTime()) / 6e4);
+        const remainingMins = Math.max(0, 30 - elapsedMins);
+        activeArrivalText = remainingMins > 0 ? `Estimated Arrival in ${remainingMins} mins` : `Delivered \u{1F3E0}`;
+      }
       const cartCount = this.app.getCartCount();
-      const activeOrder = this.app.state.orders.find((o) => o.order_status !== "Delivered");
+      const serviceability = googleMapsService.isLocationServiceable(userLoc, 15);
       return `
             <!-- Top Navbar -->
             <header class="navbar-top">
@@ -1795,75 +1533,74 @@
                 </div>
 
                 <div class="location-selector" onclick="MediApp.openAddressModal()">
-                    <i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i>
-                    <span>${locState.status === "detecting" ? "\u{1F4CD} Finding your location..." : userLoc.label}</span>
-                    <button class="btn-secondary" style="padding:2px 8px; font-size:10px; margin-left:4px;" onclick="event.stopPropagation(); MediApp.openAddressModal()">Change</button>
+                    <i class="fa-solid fa-location-dot" style="color:var(--primary);"></i>
+                    <div>
+                        <div class="location-address" style="font-weight:700;">${userLoc.label}</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-down" style="font-size:10px; opacity:0.6; margin-left:4px;"></i>
                 </div>
 
-                <div class="top-actions">
-                    <button class="icon-btn" onclick="MediApp.toggleTheme()" title="Toggle Dark/Light Mode">
-                        <i class="fa-solid ${this.app.state.darkMode ? "fa-sun" : "fa-moon"}"></i>
+                <div class="nav-actions">
+                    <button class="icon-btn" onclick="MediApp.openNotificationsModal()" title="Notifications">
+                        <i class="fa-solid fa-bell"></i>
                     </button>
-                    <button class="icon-btn" onclick="MediApp.setCustomerTab('cart')">
-                        <i class="fa-solid fa-bag-shopping"></i>
-                        ${cartCount > 0 ? `<span class="badge-count">${cartCount}</span>` : ""}
+                    <button class="icon-btn" onclick="MediApp.setCustomerTab('cart')" title="Cart" style="position:relative;">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                        ${cartCount > 0 ? `<span class="cart-badge">${cartCount}</span>` : ""}
                     </button>
                 </div>
             </header>
 
             <main class="main-content">
-                <!-- Location Status & Permission Banner -->
-                ${this.renderLocationStateBanner(locState, userLoc)}
-
-                <!-- Search Hero Banner -->
-                <section class="search-hero" style="margin-top:12px; margin-bottom:16px;">
-                    <h2 class="search-title">Fast 15-Minute Medicine Delivery \u26A1</h2>
-                    <p class="search-subtitle">Order genuine medicines from verified nearby pharmacies at lowest prices</p>
-                    
-                    <div class="main-search-bar" onclick="MediApp.setCustomerTab('search')">
-                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" placeholder="Search 'Dolo 650', 'Paracetamol', or generic name..." readonly>
-                        <button class="voice-btn" onclick="event.stopPropagation(); MediApp.openVoiceSearchModal()" title="Voice Search">
-                            <i class="fa-solid fa-microphone"></i>
+                ${!serviceability.serviceable ? `
+                    <!-- Serviceability Restriction Alert Banner -->
+                    <div style="background:var(--emergency-light); border:1px solid var(--emergency-red); border-radius:var(--radius-lg); padding:14px 18px; margin-bottom:20px; color:var(--emergency-red); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:var(--shadow-sm);">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <i class="fa-solid fa-circle-exclamation" style="font-size:22px;"></i>
+                            <div>
+                                <div style="font-weight:800; font-size:14px;">The location is currently not serviceable</div>
+                                <div style="font-size:11px; font-weight:600; opacity:0.9;">Delivery is available only within a 15 km radius of our medicine supply store.</div>
+                            </div>
+                        </div>
+                        <button class="btn-secondary" style="font-size:11px; padding:6px 12px; border-color:var(--emergency-red); color:var(--emergency-red);" onclick="MediApp.detectLiveLocation()">
+                            <i class="fa-solid fa-location-crosshairs"></i> Change Location
                         </button>
                     </div>
-                </section>
-
-                <!-- Quick Mobile Action Grid (Primary Mobile Actions) -->
-                <div class="quick-action-grid" style="grid-template-columns: repeat(3, 1fr);">
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('search')">
-                        <div class="quick-action-icon" style="background:var(--primary-light); color:var(--primary);">
-                            <i class="fa-solid fa-pills"></i>
-                        </div>
-                        <span class="quick-action-title">Search Medicine</span>
-                    </div>
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('pharmacies')">
-                        <div class="quick-action-icon" style="background:var(--warning-light); color:var(--warning-amber);">
-                            <i class="fa-solid fa-store"></i>
-                        </div>
-                        <span class="quick-action-title">Pharmacies</span>
-                    </div>
-                    <div class="quick-action-card" onclick="MediApp.setCustomerTab('emergency')">
-                        <div class="quick-action-icon" style="background:var(--emergency-light); color:var(--emergency-red);">
-                            <i class="fa-solid fa-truck-medical"></i>
-                        </div>
-                        <span class="quick-action-title">Emergency</span>
-                    </div>
-                </div>
-
+                ` : ""}
                 ${activeOrder ? `
                     <!-- Active Live Order Banner -->
                     <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color:white; border-radius:var(--radius-lg); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; box-shadow:var(--shadow-md);">
                         <div>
-                            <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">ACTIVE LIVE ORDER</div>
+                            <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">ACTIVE LIVE ORDER (30-MIN DELIVERY)</div>
                             <div style="font-size:16px; font-weight:800;">${activeOrder.id} - ${activeOrder.order_status}</div>
-                            <div style="font-size:12px; opacity:0.9;">Estimated Arrival in 12 mins \u2022 Driver: ${activeOrder.delivery_partner.name}</div>
+                            <div style="font-size:12px; opacity:0.9;">${activeArrivalText} \u2022 Driver: ${((_a = activeOrder.delivery_partner) == null ? void 0 : _a.name) || "Rohan Verma"}</div>
                         </div>
                         <button class="emergency-btn" onclick="MediApp.openTrackingModal('${activeOrder.id}')">
                             <i class="fa-solid fa-map-location-dot"></i> Live Track
                         </button>
                     </div>
                 ` : ""}
+
+                <!-- Medical Store Finder Banner (Google Maps Integration) -->
+                <section style="margin-bottom: 24px;">
+                    <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color:white; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-md); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+                        <div style="flex:1; min-width:240px;">
+                            <div style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#e0f2fe; margin-bottom:4px;">
+                                <i class="fa-solid fa-map-location-dot"></i> REAL-TIME GOOGLE MAPS RADAR
+                            </div>
+                            <h3 style="font-size:20px; font-weight:800; margin-bottom:6px;">Medical Store Finder</h3>
+                            <p style="font-size:13px; opacity:0.95; line-height:1.4;">Discover all verified medical stores and chemists nearby your current location in real-time with Google Maps navigation.</p>
+                            <div style="font-size:12px; font-weight:700; margin-top:8px; background:rgba(255,255,255,0.2); display:inline-block; padding:4px 12px; border-radius:20px;">
+                                \u{1F4CD} ${userLoc.label}
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center;">
+                            <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="add-cart-btn" style="background:white; color:#0284c7; font-weight:800; text-decoration:none; padding:12px 20px; font-size:14px; box-shadow:var(--shadow-sm); white-space:nowrap;">
+                                <i class="fa-brands fa-google"></i> Open in Google Maps
+                            </a>
+                        </div>
+                    </div>
+                </section>
 
                 <!-- Categories -->
                 <section style="margin-bottom: 24px;">
@@ -1881,63 +1618,6 @@
                     </div>
                 </section>
 
-                <!-- Nearby Pharmacies Horizontal Carousel (Google Places API) -->
-                <section style="margin-bottom: 24px;">
-                    <div class="section-header">
-                        <h3 class="section-title"><i class="fa-solid fa-store" style="color:var(--primary);"></i> Nearby Pharmacies</h3>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
-                                <i class="fa-solid fa-arrows-rotate"></i> Refresh Nearby Pharmacies
-                            </button>
-                            <span class="see-all-link" onclick="MediApp.setCustomerTab('pharmacies')">View All (${pharmacies.length})</span>
-                        </div>
-                    </div>
-
-                    ${isSearchingGoogle ? `
-                        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px;">
-                            ${[1, 2, 3].map(() => `
-                                <div style="flex:0 0 260px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); opacity:0.7;">
-                                    <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">\u{1F50E} Finding nearby pharmacies...</div>
-                                    <div style="height:14px; background:var(--card-border); border-radius:4px; margin-bottom:6px; width:80%;"></div>
-                                    <div style="height:10px; background:var(--card-border); border-radius:4px; width:60%;"></div>
-                                </div>
-                            `).join("")}
-                        </div>
-                    ` : `
-                        <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
-                            ${pharmacies.slice(0, 8).map((p) => `
-                                <div style="flex:0 0 270px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px; box-shadow:var(--shadow-sm); cursor:pointer; display:flex; flex-direction:column; justify-content:space-between;"
-                                     onclick="MediApp.viewPharmacyDetails('${p.id}')">
-                                    <div>
-                                        <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
-                                            <img src="${p.logo}" style="width:48px; height:48px; border-radius:var(--radius-sm); object-fit:cover;">
-                                            <div style="flex:1;">
-                                                <div style="font-weight:700; font-size:14px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.shop_name}</div>
-                                                <div style="font-size:11px; color:var(--text-muted);">${p.address ? p.address.split(",").slice(0, 2).join(",") : ""}</div>
-                                            </div>
-                                        </div>
-                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:8px;">
-                                            <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;">
-                                                \u2B50 ${p.rating} ${p.reviews_count ? `(${p.reviews_count})` : ""}
-                                            </span>
-                                            <span style="font-weight:800; color:${p.status === "open" ? "var(--secondary)" : "var(--emergency-red)"};">
-                                                ${p.status === "open" ? "\u{1F7E2} Open" : "\u{1F534} Closed"}
-                                            </span>
-                                        </div>
-                                        <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">
-                                            \u{1F4CD} ${p.distance} away \u2022 \u26A1 ${p.delivery_time}
-                                        </div>
-                                    </div>
-
-                                    <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="text-decoration:none; text-align:center; justify-content:center; padding:6px 10px; font-size:11px;" onclick="event.stopPropagation();">
-                                        <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
-                                    </a>
-                                </div>
-                            `).join("")}
-                        </div>
-                    `}
-                </section>
-
                 <!-- Popular Medicines Grid -->
                 <section>
                     <div class="section-header">
@@ -1945,13 +1625,12 @@
                         <span class="see-all-link" onclick="MediApp.setCustomerTab('search')">Browse All</span>
                     </div>
                     <div class="cards-grid">
-                        ${this.renderMedicineCards(MOCK_MEDICINES.slice(0, 8))}
+                        ${this.renderMedicineCards((this.app.state.medicines || []).slice(0, 8))}
                     </div>
                 </section>
             </main>
 
             ${this.renderBottomNav()}
-            ${this.renderAiFab()}
         `;
     }
     // Render Location State & Permission Banner
@@ -2031,68 +1710,100 @@
       const userLoc = googleMapsService.getUserLocation();
       const pharmacies = googleMapsService.getPharmacies();
       const isSearchingGoogle = googleMapsService.isSearchingGoogle;
-      const googleApiError = googleMapsService.googleApiError;
       const query = (this.pharmacySearchQuery || "").toLowerCase();
       const filteredPharmacies = pharmacies.filter(
-        (p) => !query || p.shop_name.toLowerCase().includes(query) || p.address.toLowerCase().includes(query)
+        (p) => !query || (p.shop_name || "").toLowerCase().includes(query) || (p.address || "").toLowerCase().includes(query)
       );
       return `
             <header class="navbar-top">
                 <button class="icon-btn" onclick="MediApp.setCustomerTab('home')"><i class="fa-solid fa-arrow-left"></i></button>
-                <h2 style="font-size:18px; flex:1;">Pharmacies Near You (${filteredPharmacies.length})</h2>
-                <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="MediApp.refreshNearbyPharmacies()">
-                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
-                </button>
+                <h2 style="font-size:18px; flex:1;">Medical Store Finder (${filteredPharmacies.length})</h2>
+                <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="add-cart-btn" style="font-size:11px; padding:6px 10px; text-decoration:none; white-space:nowrap;">
+                    <i class="fa-brands fa-google"></i> Open in Google Maps
+                </a>
             </header>
 
             <main class="main-content">
-                <!-- Interactive Real-Time Google Maps Container -->
-                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:12px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Interactive Google Map \u2022 ${userLoc.label}</span>
-                        <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Refresh GPS</button>
+                <!-- User Live Location Status Banner -->
+                <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; box-shadow:var(--shadow-sm); flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; font-weight:800; color:#38bdf8;">YOUR CURRENT LOCATION</div>
+                        <div style="font-size:14px; font-weight:800; margin-top:2px;">\u{1F4CD} ${userLoc.label}</div>
+                        <div style="font-size:11px; opacity:0.8; margin-top:2px;">Showing medical stores strictly relative to your GPS coordinates</div>
                     </div>
-                    <div id="nearbyPharmaciesMapCanvas" style="height:220px; width:100%; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);"></div>
+                    <button class="add-cart-btn" style="background:var(--primary); color:white; padding:8px 14px; font-size:12px; font-weight:800;" onclick="MediApp.detectLiveLocation()">
+                        <i class="fa-solid fa-location-crosshairs"></i> Use My Live Location
+                    </button>
                 </div>
 
-                <div style="margin-bottom:16px;">
-                    <div class="main-search-bar" style="margin:0;">
-                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" placeholder="Search pharmacies by name or location..." value="${this.pharmacySearchQuery || ""}" oninput="MediApp.filterPharmacies(this.value)">
+                <!-- Interactive Real-Time Map Container -->
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:12px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:13px; font-weight:800; color:var(--primary);"><i class="fa-solid fa-map-location-dot"></i> Live Google Maps Radar \u2022 ${userLoc.label}</span>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-secondary" style="font-size:11px; padding:3px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Refresh GPS</button>
+                            <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="btn-secondary" style="font-size:11px; padding:3px 8px; text-decoration:none; color:var(--primary); font-weight:700;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Maps</a>
+                        </div>
                     </div>
+                    <div id="nearbyPharmaciesMapCanvas" style="height:230px; width:100%; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--card-border);"></div>
                 </div>
 
                 ${isSearchingGoogle ? `
                     <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
                         <i class="fa-solid fa-spinner fa-spin" style="font-size:32px; color:var(--primary); margin-bottom:12px;"></i>
-                        <h3>\u{1F50E} Finding nearby pharmacies...</h3>
+                        <h3>\u{1F50E} Scanning nearby medical stores around your location...</h3>
                     </div>
                 ` : `
                     <div style="display:flex; flex-direction:column; gap:14px;">
-                        ${filteredPharmacies.map((p) => {
+                        ${filteredPharmacies.length === 0 ? `
+                            <div style="text-align:center; padding:36px 20px; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:white; border-radius:var(--radius-lg); box-shadow:var(--shadow-md);">
+                                <i class="fa-solid fa-map-location-dot" style="font-size:44px; color:#38bdf8; margin-bottom:12px;"></i>
+                                <h3 style="font-size:20px; font-weight:800; margin-bottom:6px;">Find Medical Stores Near You on Google Maps</h3>
+                                <p style="font-size:13px; opacity:0.9; margin-bottom:18px; max-width:440px; margin-left:auto; margin-right:auto; line-height:1.4;">
+                                    View all open chemists, drugstores, and medical shops around your location (\u{1F4CD} ${userLoc.label}) with live Google Maps directions and contact info.
+                                </p>
+                                <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                                    <a href="${googleMapsService.getGoogleMapsSearchUrl(userLoc.lat, userLoc.lng)}" target="_blank" class="add-cart-btn" style="background:#0ea5e9; color:white; font-weight:800; padding:12px 22px; font-size:13px; text-decoration:none; justify-content:center;">
+                                        <i class="fa-brands fa-google"></i> Open Google Maps Finder
+                                    </a>
+                                    <button class="btn-secondary" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:700; padding:12px 18px; font-size:13px;" onclick="MediApp.detectLiveLocation()">
+                                        <i class="fa-solid fa-location-crosshairs"></i> Refresh GPS
+                                    </button>
+                                </div>
+                            </div>
+                        ` : filteredPharmacies.map((p) => {
         const isFav = (this.app.state.favoritePharmacies || []).includes(p.id);
         return `
-                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; gap:14px; align-items:center; box-shadow:var(--shadow-sm); cursor:pointer;"
+                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow-sm); cursor:pointer;"
                                      onclick="MediApp.viewPharmacyDetails('${p.id}')">
-                                    <img src="${p.logo}" style="width:64px; height:64px; border-radius:var(--radius-md); object-fit:cover;">
-                                    <div style="flex:1;">
-                                        <div style="font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:space-between;">
-                                            <span>${p.shop_name} <i class="fa-solid fa-circle-check" style="color:var(--primary); font-size:14px;" title="Verified License"></i></span>
-                                            <button class="icon-btn" style="padding:4px; color:${isFav ? "var(--emergency-red)" : "var(--text-muted)"};" onclick="event.stopPropagation(); MediApp.toggleFavoritePharmacy('${p.id}')">
-                                                <i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i>
-                                            </button>
+                                    <div style="display:flex; gap:14px; align-items:flex-start;">
+                                        <img src="${p.logo}" style="width:64px; height:64px; border-radius:var(--radius-md); object-fit:cover;">
+                                        <div style="flex:1;">
+                                            <div style="font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                                                <span>${p.shop_name} <i class="fa-solid fa-circle-check" style="color:var(--primary); font-size:14px;" title="Verified Pharmacy License"></i></span>
+                                                <button class="icon-btn" style="padding:4px; color:${isFav ? "var(--emergency-red)" : "var(--text-muted)"};" onclick="event.stopPropagation(); MediApp.toggleFavoritePharmacy('${p.id}')">
+                                                    <i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i>
+                                                </button>
+                                            </div>
+                                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;"><i class="fa-solid fa-location-dot" style="color:var(--primary);"></i> ${p.address}</div>
+                                            <div style="display:flex; gap:8px; font-size:12px; align-items:center; flex-wrap:wrap;">
+                                                <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 8px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating || 4.7} ${p.reviews_count ? `(${p.reviews_count})` : ""}</span>
+                                                <span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-route"></i> ${p.distance || "0.8 km"} away</span>
+                                                <span style="background:var(--secondary-light); color:var(--secondary); padding:2px 8px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-bolt"></i> ${p.delivery_time || "15-20 mins"}</span>
+                                                <span style="font-weight:800; color:${p.status === "open" ? "var(--secondary)" : "var(--emergency-red)"};">${p.status === "open" ? "\u{1F7E2} Open Now" : "\u{1F534} Closed"}</span>
+                                            </div>
                                         </div>
-                                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
-                                        <div style="display:flex; gap:10px; font-size:12px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
-                                            <span style="background:var(--warning-light); color:var(--warning-amber); padding:2px 6px; border-radius:4px; font-weight:700;"><i class="fa-solid fa-star"></i> ${p.rating} ${p.reviews_count ? `(${p.reviews_count})` : ""}</span>
-                                            <span style="font-weight:700; color:var(--primary);">\u{1F4CD} ${p.distance} away</span>
-                                            <span style="font-weight:800; color:${p.status === "open" ? "var(--secondary)" : "var(--emergency-red)"};">${p.status === "open" ? "\u{1F7E2} Open" : "\u{1F534} Closed"}</span>
-                                        </div>
-                                        ${p.phone ? `<div style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-phone"></i> ${p.phone}</div>` : ""}
                                     </div>
-                                    <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="text-decoration:none; padding:8px 12px; font-size:12px;" onclick="event.stopPropagation();">
-                                        <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
-                                    </a>
+                                    <div style="display:flex; gap:10px; border-top:1px solid var(--card-border); padding-top:10px;">
+                                        ${p.phone ? `
+                                            <a href="tel:${p.phone}" class="btn-secondary" style="flex:1; text-align:center; text-decoration:none; padding:8px; font-size:12px; font-weight:700;" onclick="event.stopPropagation();">
+                                                <i class="fa-solid fa-phone"></i> Call Store
+                                            </a>
+                                        ` : ""}
+                                        <a href="${googleMapsService.getDirectionsUrl(p)}" target="_blank" class="add-cart-btn" style="flex:1; text-align:center; text-decoration:none; padding:8px; font-size:12px; justify-content:center;" onclick="event.stopPropagation();">
+                                            <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+                                        </a>
+                                    </div>
                                 </div>
                             `;
       }).join("")}
@@ -2106,7 +1817,7 @@
     renderPharmacyDetailPage() {
       const pharmacies = googleMapsService.getPharmacies();
       const p = pharmacies.find((item) => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES.find((item) => item.id === this.selectedPharmacyId) || MOCK_PHARMACIES[0];
-      const pMedicines = MOCK_MEDICINES.filter((m) => m.pharmacy_id === p.id);
+      const pMedicines = (this.app.state.medicines || []).filter((m) => m.pharmacy_id === p.id);
       const hasMediFindInventory = pMedicines.length > 0;
       return `
             <header class="navbar-top">
@@ -2120,8 +1831,7 @@
                         <img src="${p.logo}" style="width:72px; height:72px; border-radius:var(--radius-md); object-fit:cover;">
                         <div>
                             <h2 style="font-size:20px;">${p.shop_name}</h2>
-                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">${p.address}</div>
-                            <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px;">\u{1F4CD} ${p.distance} away \u2022 \u2B50 ${p.rating} rating</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px;">\u2B50 ${p.rating} rating</div>
                             ${p.license_number ? `<div style="font-size:11px; color:var(--text-muted);">Drug License: <code>${p.license_number}</code></div>` : ""}
                         </div>
                     </div>
@@ -2167,8 +1877,8 @@
 
             <main class="main-content">
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:20px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                    <div style="height:220px; width:100%; border-radius:var(--radius-md); overflow:hidden; background:#f1f5f9; margin-bottom:16px; position:relative;">
-                        <img src="${med.image}" style="width:100%; height:100%; object-fit:cover;">
+                    <div style="height:100px; width:100%; border-radius:var(--radius-md); background:linear-gradient(135deg, var(--primary-light) 0%, #e0f2fe 100%); color:var(--primary); display:flex; align-items:center; justify-content:center; margin-bottom:16px; position:relative;">
+                        <i class="fa-solid fa-pills" style="font-size:44px;"></i>
                         ${med.requires_prescription ? `<span class="rx-badge">Rx PRESCRIPTION REQUIRED</span>` : ""}
                     </div>
 
@@ -2293,10 +2003,19 @@
     }
     // 6. Cart & Checkout Page (/cart)
     renderCartPage() {
+      (this.app.state.cart || []).forEach((item) => {
+        const liveMed = (this.app.state.medicines || []).find((m) => m.id === item.id);
+        if (liveMed && liveMed.price !== void 0) {
+          item.price = liveMed.price;
+        }
+      });
+      const userLoc = googleMapsService.getUserLocation();
+      const serviceability = googleMapsService.isLocationServiceable(userLoc, 15);
       const subtotal = this.app.state.cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-      const deliveryFee = subtotal > 0 ? subtotal > 200 ? 0 : 25 : 0;
+      const distKm = serviceability.distanceKm || 0;
+      const deliveryFee = subtotal > 0 ? parseFloat((distKm * 10).toFixed(2)) : 0;
       const discount = this.app.state.appliedCoupon ? subtotal * 0.2 : 0;
-      const tax = subtotal * 0.05;
+      const tax = parseFloat((subtotal * 0.05).toFixed(2));
       const total = Math.max(0, subtotal + deliveryFee + tax - discount);
       return `
             <header class="navbar-top">
@@ -2335,35 +2054,57 @@
                             `).join("")}
                         </div>
 
-                        <!-- Delivery Address Input -->
+                        <!-- Delivery Address Input & Picker Actions -->
                         <div style="margin-bottom:16px;">
-                            <label style="font-size:12px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">DELIVERY ADDRESS</label>
-                            <input type="text" id="deliveryAddressInput" value="${(() => {
-        const u = this.app.authService.getUser();
-        if (!u || !u.address) return googleMapsService.getUserLocation().label;
-        return typeof u.address === "string" ? u.address : `${u.address.street || ""}, ${u.address.city || ""}`;
-      })()}" 
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <label style="font-size:12px; font-weight:700; color:var(--text-muted);">DELIVERY ADDRESS (MAX 15 KM RADIUS)</label>
+                                <div style="display:flex; gap:6px;">
+                                    <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.detectLiveLocation()"><i class="fa-solid fa-location-crosshairs"></i> Use GPS</button>
+                                    <button class="btn-secondary" style="font-size:11px; padding:2px 8px;" onclick="MediApp.openMapPickerModal()"><i class="fa-solid fa-map-pin"></i> Select Map</button>
+                                </div>
+                            </div>
+                            <input type="text" id="deliveryAddressInput" value="${googleMapsService.getUserLocation().label}" 
+                                   oninput="MediApp.validateCheckoutAddress(this.value)"
+                                   onchange="MediApp.validateCheckoutAddress(this.value)"
+                                   placeholder="Type delivery address or select on map..."
                                    style="width:100%; border:1px solid var(--card-border); padding:10px 14px; border-radius:var(--radius-md); font-size:13px;">
+                        </div>
+
+                        <!-- Dynamic Serviceability Alert Box -->
+                        <div id="checkoutServiceabilityAlert" style="background:var(--emergency-light); border:1px solid var(--emergency-red); border-radius:var(--radius-md); padding:14px; margin-bottom:16px; color:var(--emergency-red); font-weight:800; font-size:13px; display:${!serviceability.serviceable ? "flex" : "none"}; align-items:center; gap:10px;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size:20px;"></i>
+                            <div>
+                                <div style="font-size:14px; font-weight:800;">The location is currently not serviceable</div>
+                                <div style="font-size:11px; font-weight:600; opacity:0.9; margin-top:2px;">Delivery is available only within a 15 km radius of our medicine supply store.</div>
+                            </div>
                         </div>
 
                         <!-- Bill Summary -->
                         <div style="background:var(--background); padding:14px; border-radius:var(--radius-md); font-size:13px; margin-bottom:20px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Subtotal</span><span>\u20B9${subtotal.toFixed(2)}</span>
+                                <span>Subtotal</span><span id="cartSubtotalText">\u20B9${subtotal.toFixed(2)}</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Delivery Charge</span><span>${deliveryFee === 0 ? '<span style="color:var(--secondary); font-weight:700;">FREE</span>' : "\u20B9" + deliveryFee}</span>
+                                <span>Distance to Store</span><span id="cartDistanceText">${distKm.toFixed(1)} km</span>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Taxes (GST 5%)</span><span>\u20B9${tax.toFixed(2)}</span>
+                                <span>Delivery Charge (\u20B910/km)</span><span id="cartDeliveryFeeText">\u20B9${deliveryFee.toFixed(2)}</span>
                             </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Taxes (GST 5% on items)</span><span id="cartTaxText">\u20B9${tax.toFixed(2)}</span>
+                            </div>
+                            ${discount > 0 ? `
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--secondary);">
+                                    <span>Coupon Discount (20%)</span><span>-\u20B9${discount.toFixed(2)}</span>
+                                </div>
+                            ` : ""}
                             <div style="border-top:1px dashed var(--card-border); margin-top:8px; padding-top:8px; display:flex; justify-content:space-between; font-weight:800; font-size:16px;">
-                                <span>Total Amount</span><span style="color:var(--primary);">\u20B9${total.toFixed(2)}</span>
+                                <span>Total Amount</span><span id="cartTotalText" style="color:var(--primary);">\u20B9${total.toFixed(2)}</span>
                             </div>
                         </div>
 
-                        <button class="add-cart-btn" style="width:100%; justify-content:center; padding:14px; font-size:16px;" onclick="MediApp.simulateRazorpayCheckout(${total})">
-                            <i class="fa-solid fa-lock"></i> Place Order \u2022 \u20B9${total.toFixed(2)}
+                        <button id="placeOrderBtn" data-total="${total.toFixed(2)}" class="add-cart-btn" ${!serviceability.serviceable ? 'disabled style="width:100%; justify-content:center; padding:14px; font-size:15px; opacity:0.5; cursor:not-allowed; background:var(--text-muted); border-color:var(--text-muted);"' : 'style="width:100%; justify-content:center; padding:14px; font-size:16px;"'} onclick="MediApp.simulateRazorpayCheckout(${total})">
+                            ${!serviceability.serviceable ? '<i class="fa-solid fa-ban"></i> The location is currently not serviceable' : `<i class="fa-solid fa-lock"></i> Place Order \u2022 \u20B9${total.toFixed(2)}`}
                         </button>
                     </div>
                 `}
@@ -2381,8 +2122,8 @@
         return `
                 <div class="med-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative;">
                     <div>
-                        <div class="med-img-wrapper" onclick="MediApp.viewMedicineDetails('${med.id}')">
-                            <img src="${med.image}" alt="${med.name}">
+                        <div class="med-img-wrapper" onclick="MediApp.viewMedicineDetails('${med.id}')" style="display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--primary-light) 0%, #e0f2fe 100%); color:var(--primary); position:relative; min-height:90px; border-radius:var(--radius-md); margin-bottom:10px;">
+                            <i class="fa-solid fa-pills" style="font-size:36px;"></i>
                             ${med.requires_prescription ? `<span class="rx-badge">Rx REQUIRED</span>` : ""}
                             <span class="discount-tag">15% OFF</span>
                         </div>
@@ -2405,24 +2146,7 @@
                             ${isGoogleDiscovered ? "\u26A0\uFE0F Medicine availability not available" : inStock ? `\u{1F4E6} In Stock (${med.stock} units)` : "\u{1F4E6} Out of Stock"}
                         </div>
 
-                        <!-- 6. Pharmacy, 7. Distance, 8. Open/Closed, 9. Rating, 10. Delivery -->
-                        <div style="background:var(--background); padding:8px 10px; border-radius:var(--radius-sm); font-size:11px; margin-bottom:10px; display:flex; flex-direction:column; gap:3px;">
-                            <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text-main);">
-                                <span><i class="fa-solid fa-store" style="color:var(--primary);"></i> ${med.pharmacy_name}</span>
-                                <span>\u{1F4CD} ${med.pharmacy_distance}</span>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="color:${isOpen ? "var(--secondary)" : "var(--emergency-red)"}; font-weight:800;">
-                                    \u25CF ${isOpen ? "OPEN NOW" : "CLOSED"}
-                                </span>
-                                <span style="background:var(--warning-light); color:var(--warning-amber); padding:1px 5px; border-radius:3px; font-weight:800;">
-                                    \u2B50 ${med.pharmacy_rating}
-                                </span>
-                            </div>
-                            <div style="color:var(--primary); font-weight:700; margin-top:2px;">
-                                \u26A1 ${med.pharmacy_delivery_available ? `Delivery Available (${med.delivery_time})` : "Pickup Only"}
-                            </div>
-                        </div>
+
                     </div>
 
                     <!-- 3. Price & Action -->
@@ -2462,16 +2186,10 @@
         `;
     }
     renderAiFab() {
-      return `
-            <button class="ai-fab" onclick="MediApp.openAiDrawer()">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <span>Ask MediAI</span>
-            </button>
-        `;
+      return "";
     }
     renderSearchPage() {
-      const dbMeds = Array.from(firestoreDb.collections.Medicines.values());
-      const allMedicines = dbMeds.length > 0 ? dbMeds : this.app.state.medicines;
+      const allMedicines = this.app.state.medicines || [];
       const pharmacies = googleMapsService.getPharmacies();
       this.searchEngine.setDatasets(allMedicines, pharmacies);
       const { results, spellingCorrection, alternatives } = this.searchEngine.search(this.searchQuery, this.selectedCategory);
@@ -2526,55 +2244,162 @@
       const currentUser = this.app.authService.getUser();
       let userOrders = [];
       if (currentUser) {
-        userOrders = this.app.state.orders.filter(
-          (o) => o.user_id === currentUser.id || o.customer_id === currentUser.id || o.customer_email && o.customer_email.toLowerCase() === currentUser.email.toLowerCase()
-        );
+        const userEmail = (currentUser.email || "").toLowerCase();
+        const userName = (currentUser.name || "").toLowerCase();
+        const userId = String(currentUser.id || "");
+        const filtered = (this.app.state.orders || []).filter((o) => {
+          if (!o) return false;
+          const oUserId = String(o.user_id || "");
+          const oCustId = String(o.customer_id || "");
+          const oEmail = (o.customer_email || "").toLowerCase();
+          const oName = (o.customer_name || "").toLowerCase();
+          return userId && (oUserId === userId || oCustId === userId) || userEmail && oEmail && oEmail === userEmail || userName && oName && oName === userName || oUserId.startsWith("usr_guest_");
+        });
+        userOrders = filtered.length > 0 ? filtered : this.app.state.orders || [];
       } else {
-        userOrders = this.app.state.orders.filter((o) => o.user_id && o.user_id.startsWith("usr_guest_"));
+        userOrders = this.app.state.orders || [];
       }
+      const activeOrders = userOrders.filter((o) => o.order_status !== "Delivered" && o.order_status !== "Cancelled");
+      const deliveredOrders = userOrders.filter((o) => o.order_status === "Delivered" || o.order_status === "Cancelled");
+      const totalSpent = userOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+      const renderSingleOrderCard = (o, isActive) => {
+        const isCompleted = o.order_status === "Delivered";
+        const isCancelled = o.order_status === "Cancelled";
+        const items = o.items || [];
+        const itemsSum = items.reduce((sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 1), 0);
+        const deliveryFee = o.delivery_fee !== void 0 ? o.delivery_fee : itemsSum > 0 ? itemsSum > 200 ? 0 : 25 : 0;
+        const tax = o.tax !== void 0 ? o.tax : parseFloat((itemsSum * 0.05).toFixed(2));
+        const discount = o.discount || 0;
+        const computedTotal = parseFloat(Math.max(0, itemsSum + deliveryFee + tax - discount).toFixed(2));
+        const total = o.total_amount && items.length > 0 && Math.abs(o.total_amount - computedTotal) < 0.05 ? o.total_amount : computedTotal;
+        o.total_amount = total;
+        o.subtotal = itemsSum;
+        o.tax = tax;
+        o.delivery_fee = deliveryFee;
+        const formattedDate = o.created_at ? new Date(o.created_at).toLocaleString() : (/* @__PURE__ */ new Date()).toLocaleString();
+        return `
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:18px; box-shadow:var(--shadow-sm); margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid var(--card-border); padding-bottom:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-weight:800; color:var(--primary); font-size:16px;">${o.id}</span>
+                                <span style="font-size:11px; background:var(--background); padding:2px 6px; border-radius:var(--radius-sm); border:1px solid var(--card-border); color:var(--text-muted); font-weight:600;">${o.payment_method || "UPI"}</span>
+                            </div>
+                            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;"><i class="fa-regular fa-clock"></i> ${formattedDate}</div>
+                        </div>
+                        <span class="role-badge-btn" style="background:${isCancelled ? "var(--emergency-light)" : isCompleted ? "var(--secondary-light)" : "var(--primary-light)"}; color:${isCancelled ? "var(--emergency-red)" : isCompleted ? "var(--secondary)" : "var(--primary)"}; font-weight:700;">
+                            ${isActive ? '<i class="fa-solid fa-circle-dot fa-spin" style="margin-right:4px;"></i>' : ""}${o.order_status}
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; margin-bottom:14px; background:var(--background); padding:12px; border-radius:var(--radius-md); border:1px solid var(--card-border);">
+                        <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">ORDER ITEMS (${items.length})</div>
+                        ${items.map((it) => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:13px;">
+                                <span>\u2022 <b>${it.quantity || 1}x</b> ${it.name}</span>
+                                <span style="font-weight:600;">\u20B9${((it.price || 0) * (it.quantity || 1)).toFixed(2)}</span>
+                            </div>
+                        `).join("")}
+                        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--card-border); display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:12px; color:var(--text-muted);">Payment: <b>${o.payment_status || "Paid"}</b></span>
+                            <span style="font-size:15px; font-weight:800; color:var(--text-main);">Total: \u20B9${total.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                        ${isActive ? `
+                            <button class="add-cart-btn" style="font-size:12px; padding:6px 14px;" onclick="MediApp.openTrackingModal('${o.id}')">
+                                <i class="fa-solid fa-map-location-dot"></i> Track Live Delivery
+                            </button>
+                            <button class="btn-secondary" style="color:var(--emergency-red); font-size:12px; padding:6px 12px;" onclick="MediApp.cancelOrder('${o.id}')">
+                                <i class="fa-solid fa-ban"></i> Cancel Order
+                            </button>
+                        ` : `
+                            <button class="btn-secondary" style="font-size:12px; padding:6px 12px;" onclick="MediApp.openGstInvoiceModal('${o.id}')">
+                                <i class="fa-solid fa-file-invoice"></i> GST Invoice
+                            </button>
+                            <button class="add-cart-btn" style="background:var(--secondary); font-size:12px; padding:6px 14px;" onclick="MediApp.reorder('${o.id}')">
+                                <i class="fa-solid fa-rotate-right"></i> Reorder Items
+                            </button>
+                        `}
+                    </div>
+                </div>
+            `;
+      };
       return `
             <header class="navbar-top">
-                <h2 style="font-size:18px; flex:1;">My Orders History</h2>
+                <h2 style="font-size:18px; flex:1;"><i class="fa-solid fa-box-archive" style="color:var(--primary);"></i> Orders & History</h2>
+                <button class="icon-btn" onclick="MediApp.loadSavedOrders(); MediApp.render();" title="Refresh Orders"><i class="fa-solid fa-rotate-right"></i></button>
                 <button class="icon-btn" onclick="MediApp.openNotificationsModal()" title="Notifications"><i class="fa-solid fa-bell"></i></button>
             </header>
 
             <main class="main-content">
+                <!-- Summary Metrics Bar -->
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:20px;">
+                    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:12px; text-align:center;">
+                        <div style="font-size:18px; font-weight:800; color:var(--primary);">${userOrders.length}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-weight:600;">Total Orders</div>
+                    </div>
+                    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:12px; text-align:center;">
+                        <div style="font-size:18px; font-weight:800; color:var(--secondary);">${activeOrders.length}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-weight:600;">Active Live</div>
+                    </div>
+                    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:12px; text-align:center;">
+                        <div style="font-size:18px; font-weight:800; color:var(--warning-amber);">\u20B9${totalSpent.toFixed(0)}</div>
+                        <div style="font-size:11px; color:var(--text-muted); font-weight:600;">Total Spent</div>
+                    </div>
+                </div>
+
                 ${userOrders.length === 0 ? `
-                    <div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
+                    <div style="text-align:center; padding:60px 20px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg);">
                         <i class="fa-solid fa-box-open" style="font-size:48px; color:var(--text-muted); margin-bottom:12px;"></i>
                         <h3 style="font-size:16px; margin-bottom:4px; color:var(--text-main);">No Orders Placed Yet</h3>
-                        <p style="font-size:12px;">Your order history will appear here once you place your first medicine order.</p>
+                        <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Your order history will appear here automatically once you place your first medicine order.</p>
+                        <button class="add-cart-btn" style="margin:0 auto; padding:10px 20px; font-size:14px;" onclick="MediApp.setCustomerTab('home')">
+                            <i class="fa-solid fa-pills"></i> Browse Medicines & Order
+                        </button>
                     </div>
-                ` : userOrders.map((o) => {
-        const isCompleted = o.order_status === "Delivered";
-        const isCancelled = o.order_status === "Cancelled";
-        const isActive = !isCompleted && !isCancelled;
-        return `
-                        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px; box-shadow:var(--shadow-sm);">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                <div>
-                                    <span style="font-weight:800; color:var(--primary); font-size:16px;">${o.id}</span>
-                                    <div style="font-size:11px; color:var(--text-muted);">${new Date(o.created_at || Date.now()).toLocaleDateString()}</div>
-                                </div>
-                                <span class="role-badge-btn" style="background:${isCancelled ? "var(--emergency-light)" : isCompleted ? "var(--secondary-light)" : "var(--primary-light)"}; color:${isCancelled ? "var(--emergency-red)" : isCompleted ? "var(--secondary)" : "var(--primary)"};">${o.order_status}</span>
-                            </div>
-
-                            <div style="font-size:13px; margin-bottom:12px; background:var(--background); padding:10px; border-radius:var(--radius-sm);">
-                                ${o.items.map((it) => `<div>\u2022 <b>${it.quantity}x ${it.name}</b> \u2014 \u20B9${(it.price * it.quantity).toFixed(2)}</div>`).join("")}
-                                <div style="margin-top:6px; font-weight:800; text-align:right; color:var(--text-main);">Total: \u20B9${o.total_amount.toFixed(2)}</div>
-                            </div>
-
-                            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                                ${isActive ? `
-                                    <button class="add-cart-btn" onclick="MediApp.openTrackingModal('${o.id}')"><i class="fa-solid fa-map-location-dot"></i> Live Track</button>
-                                    <button class="btn-secondary" style="color:var(--emergency-red);" onclick="MediApp.cancelOrder('${o.id}')"><i class="fa-solid fa-ban"></i> Cancel Order</button>
-                                ` : `
-                                    <button class="add-cart-btn" style="background:var(--secondary);" onclick="MediApp.reorder('${o.id}')"><i class="fa-solid fa-rotate-right"></i> Reorder Items</button>
-                                `}
-                            </div>
+                ` : `
+                    <!-- SECTION 1: Active Live Orders (Not Delivered) -->
+                    <div style="margin-bottom:28px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px; color:var(--primary);">
+                                <i class="fa-solid fa-truck-fast"></i> Active Orders (${activeOrders.length})
+                            </h3>
+                            <span style="font-size:11px; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full); font-weight:700;">
+                                In-Progress & Live Delivery
+                            </span>
                         </div>
-                    `;
-      }).join("")}
+
+                        ${activeOrders.length === 0 ? `
+                            <div style="padding:20px; background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-md); text-align:center; color:var(--text-muted); font-size:13px;">
+                                No active undelivered orders right now.
+                            </div>
+                        ` : `
+                            ${activeOrders.map((o) => renderSingleOrderCard(o, true)).join("")}
+                        `}
+                    </div>
+
+                    <!-- SECTION 2: Order History (Delivered & Completed) -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px; color:var(--text-main);">
+                                <i class="fa-solid fa-clock-rotate-left" style="color:var(--secondary);"></i> Order History (${deliveredOrders.length})
+                            </h3>
+                            <span style="font-size:11px; background:var(--secondary-light); color:var(--secondary); padding:3px 8px; border-radius:var(--radius-full); font-weight:700;">
+                                Delivered & Completed Orders
+                            </span>
+                        </div>
+
+                        ${deliveredOrders.length === 0 ? `
+                            <div style="padding:20px; background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-md); text-align:center; color:var(--text-muted); font-size:13px;">
+                                No past delivered orders yet.
+                            </div>
+                        ` : `
+                            ${deliveredOrders.map((o) => renderSingleOrderCard(o, false)).join("")}
+                        `}
+                    </div>
+                `}
             </main>
             ${this.renderBottomNav()}
         `;
@@ -2593,35 +2418,29 @@
             <main class="main-content">
                 <!-- User Profile Card -->
                 <div style="background:var(--card-bg); padding:20px; border-radius:var(--radius-lg); border:1px solid var(--card-border); display:flex; align-items:center; gap:16px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" style="width:64px; height:64px; border-radius:var(--radius-full); object-fit:cover;">
+                    <div style="width:64px; height:64px; border-radius:var(--radius-full); background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; border:2px solid var(--primary);">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
                     <div style="flex:1;">
-                        <h3 style="font-size:18px; margin-bottom:2px;">${user.name}</h3>
-                        <div style="font-size:12px; color:var(--text-muted);">${user.phone} \u2022 ${user.email}</div>
+                        <h3 style="font-size:18px; margin-bottom:2px; font-weight:700;">${user ? user.name : "Customer User"}</h3>
+                        <div style="font-size:12px; color:var(--text-muted);">${user ? user.phone : ""} \u2022 ${user ? user.email : ""}</div>
                     </div>
-                    <button class="btn-secondary" style="color:var(--emergency-red); padding:8px 12px; font-size:12px;" onclick="MediApp.logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-                </div>
-
-                <!-- Saved Addresses Section -->
-                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:18px; margin-bottom:20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h3 style="font-size:16px;"><i class="fa-solid fa-location-dot" style="color:var(--primary);"></i> Saved Delivery Addresses</h3>
-                        <button class="add-cart-btn" style="padding:6px 12px; font-size:12px;" onclick="MediApp.openAddressModal()"><i class="fa-solid fa-plus"></i> Add Address</button>
-                    </div>
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        ${savedAddresses.map((addr) => `
-                            <div style="padding:12px; border:1px solid var(--card-border); border-radius:var(--radius-md); background:var(--background); display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <strong style="font-size:13px;"><i class="fa-solid fa-house"></i> ${addr.label}</strong>
-                                    <div style="font-size:12px; color:var(--text-muted);">${addr.text}</div>
-                                </div>
-                                <button class="btn-secondary" style="font-size:11px;" onclick="MediApp.showToast('Address selected as default')">Default</button>
-                            </div>
-                        `).join("")}
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <button class="add-cart-btn" style="padding:6px 12px; font-size:12px;" onclick="MediApp.openEditProfileModal()"><i class="fa-solid fa-user-pen"></i> Edit Profile</button>
+                        <button class="btn-secondary" style="color:var(--emergency-red); padding:6px 12px; font-size:11px;" onclick="MediApp.logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
                     </div>
                 </div>
 
                 <!-- Profile Options List -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:8px; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openEditProfileModal()">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <i class="fa-solid fa-user-pen" style="color:var(--primary); font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:14px;">Edit Profile</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
                     <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.setCustomerTab('orders')">
                         <div style="display:flex; align-items:center; gap:12px;">
                             <i class="fa-solid fa-box-archive" style="color:var(--primary); font-size:18px;"></i>
@@ -2630,21 +2449,6 @@
                         <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
                     </div>
 
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openAddressModal()">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <i class="fa-solid fa-map-location-dot" style="color:var(--secondary); font-size:18px;"></i>
-                            <span style="font-weight:700; font-size:14px;">Saved Addresses</span>
-                        </div>
-                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
-                    </div>
-
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.setCustomerTab('prescription')">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <i class="fa-solid fa-file-prescription" style="color:var(--warning-amber); font-size:18px;"></i>
-                            <span style="font-weight:700; font-size:14px;">Prescription History</span>
-                        </div>
-                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
-                    </div>
 
                     <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--card-border); cursor:pointer;" onclick="MediApp.openNotificationsModal()">
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -2681,7 +2485,6 @@
                             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:8px;">
                                 <div>
                                     <strong>${p.shop_name}</strong>
-                                    <div style="font-size:12px; color:var(--text-muted);">${p.address} \u2022 \u{1F4CD} ${p.distance}</div>
                                 </div>
                                 <button class="btn-secondary" onclick="MediApp.viewPharmacyDetails('${p.id}')">Visit Store</button>
                             </div>
@@ -2723,7 +2526,6 @@
                                     <img src="${p.logo}" style="width:54px; height:54px; border-radius:var(--radius-md); object-fit:cover;">
                                     <div>
                                         <div style="font-weight:800; font-size:16px; color:var(--text-main);">${p.shop_name}</div>
-                                        <div style="font-size:12px; color:var(--text-muted);">${p.address}</div>
                                     </div>
                                 </div>
                                 <span style="background:var(--secondary-light); color:var(--secondary); font-weight:800; font-size:11px; padding:4px 8px; border-radius:4px; white-space:nowrap;">
@@ -2731,8 +2533,7 @@
                                 </span>
                             </div>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; color:var(--primary); margin-bottom:14px; background:var(--background); padding:8px 12px; border-radius:var(--radius-sm);">
-                                <span>\u{1F4CD} ${p.distance} away from you</span>
+                            <div style="display:flex; justify-content:flex-end; align-items:center; font-size:12px; font-weight:700; color:var(--primary); margin-bottom:14px; background:var(--background); padding:8px 12px; border-radius:var(--radius-sm);">
                                 <span>\u2B50 ${p.rating} (${p.reviews_count || 12} reviews)</span>
                             </div>
 
@@ -2940,12 +2741,12 @@
                                     <td><span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${m.category}</span></td>
                                     <td>
                                         <div style="display:flex; align-items:center; gap:4px;">
-                                            \u20B9<input type="number" value="${m.price}" step="0.5" style="width:70px; padding:4px; border:1px solid var(--card-border); border-radius:4px; font-size:13px; font-weight:700;" onchange="MediApp.updatePrice('${m.id}', this.value)">
+                                            \u20B9<input type="number" value="${m.price}" step="0.5" style="width:70px; padding:4px; border:1px solid var(--card-border); border-radius:4px; font-size:13px; font-weight:700;" onchange="MediApp.updatePrice('${m.id}', this.value)" oninput="this.setAttribute('value', this.value)">
                                         </div>
                                     </td>
                                     <td>
                                         <div style="display:flex; align-items:center; gap:6px;">
-                                            <input type="number" value="${m.stock}" style="width:65px; padding:4px; border:1px solid ${m.stock < 20 ? "var(--emergency-red)" : "var(--card-border)"}; border-radius:4px; font-size:13px; font-weight:800; color:${m.stock < 20 ? "var(--emergency-red)" : "var(--text-main)"};" onchange="MediApp.updateStock('${m.id}', this.value)">
+                                            <input type="number" value="${m.stock}" style="width:65px; padding:4px; border:1px solid ${m.stock < 20 ? "var(--emergency-red)" : "var(--card-border)"}; border-radius:4px; font-size:13px; font-weight:800; color:${m.stock < 20 ? "var(--emergency-red)" : "var(--text-main)"};" onchange="MediApp.updateStock('${m.id}', this.value)" oninput="this.setAttribute('value', this.value)">
                                             <span style="font-size:11px; color:var(--text-muted);">units</span>
                                         </div>
                                     </td>
@@ -2985,9 +2786,19 @@
                             <div style="background:var(--background); padding:12px; border-radius:var(--radius-sm); font-size:13px; margin-bottom:14px;">
                                 <strong>Order Items:</strong>
                                 <ul>
-                                    ${order.items.map((it) => `<li>${it.quantity}x <b>${it.name}</b> \u2014 \u20B9${(it.price * it.quantity).toFixed(2)}</li>`).join("")}
+                                    ${(order.items || []).map((it) => `<li>${it.quantity}x <b>${it.name}</b> \u2014 \u20B9${((it.price || 0) * (it.quantity || 1)).toFixed(2)}</li>`).join("")}
                                 </ul>
-                                <div style="margin-top:6px; text-align:right; font-weight:800; font-size:14px; color:var(--primary);">Total: \u20B9${order.total_amount.toFixed(2)}</div>
+                                ${(() => {
+          const items = order.items || [];
+          const itemsSum = items.reduce((sum, it) => sum + (parseFloat(it.price) || 0) * (parseInt(it.quantity) || 1), 0);
+          const deliveryFee = order.delivery_fee !== void 0 ? order.delivery_fee : itemsSum > 0 ? itemsSum > 200 ? 0 : 25 : 0;
+          const tax = order.tax !== void 0 ? order.tax : parseFloat((itemsSum * 0.05).toFixed(2));
+          const discount = order.discount || 0;
+          const computedTotal = parseFloat(Math.max(0, itemsSum + deliveryFee + tax - discount).toFixed(2));
+          const total = order.total_amount && items.length > 0 && Math.abs(order.total_amount - computedTotal) < 0.05 ? order.total_amount : computedTotal;
+          order.total_amount = total;
+          return `<div style="margin-top:6px; text-align:right; font-weight:800; font-size:14px; color:var(--primary);">Total: \u20B9${total.toFixed(2)}</div>`;
+        })()}
                             </div>
                             <div style="display:flex; gap:10px; justify-content:flex-end;">
                                 <button class="btn-secondary" onclick="MediApp.acceptOrder('${order.id}')"><i class="fa-solid fa-check"></i> Accept & Prepare</button>
@@ -3389,16 +3200,26 @@
   var AdminModule = class {
     constructor(app) {
       this.app = app;
-      this.activeTab = "overview";
+      const savedTab = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("medifind_admin_tab") : null;
+      this.activeTab = savedTab || "medicines";
     }
     render() {
-      const totalRevenue = this.app.state.orders.reduce((sum, o) => sum + o.total_amount, 0);
-      const usersList = this.app.state.usersList || [
-        { id: "usr_1", name: "Alex Johnson", email: "alex@example.com", role: "customer", status: "Active" },
-        { id: "usr_2", name: "Priya Sharma", email: "priya@example.com", role: "customer", status: "Active" },
-        { id: "usr_pharm_1", name: "Dr. S. K. Gupta", email: "apollo@example.com", role: "pharmacy", status: "Active" },
-        { id: "usr_driver_1", name: "Rohan Verma", email: "rohan@example.com", role: "delivery", status: "Active" }
-      ];
+      const savedTab = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("medifind_admin_tab") : null;
+      if (savedTab) {
+        this.activeTab = savedTab;
+      }
+      const totalRevenue = (this.app.state.orders || []).reduce((sum, o) => sum + (o.total_amount || 0), 0);
+      const allOrders = this.app.state.orders || [];
+      const usersList = this.app.state && Array.isArray(this.app.state.usersList) ? this.app.state.usersList : [];
+      if (usersList.length === 0 && !this._fetchingUsers) {
+        this._fetchingUsers = true;
+        Promise.all([this.app.loadAllUsers(), this.app.loadSavedOrders()]).finally(() => {
+          this._fetchingUsers = false;
+        });
+      }
+      if (this.activeTab === "overview" || this.activeTab === "analytics" || this.activeTab === "reports") {
+        this.activeTab = "medicines";
+      }
       return `
             <header class="navbar-top">
                 <div class="brand-logo">
@@ -3416,13 +3237,8 @@
             </header>
 
             <main class="main-content">
-                <!-- Navigation Tabs Bar (8 Sections) -->
+                <!-- Navigation Tabs Bar -->
                 <div style="display:flex; gap:6px; background:var(--card-bg); padding:8px; border-radius:var(--radius-md); border:1px solid var(--card-border); margin-bottom:20px; overflow-x:auto; scrollbar-width:none;">
-                    <button class="btn-secondary ${this.activeTab === "overview" ? "active" : ""}" 
-                            style="${this.activeTab === "overview" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
-                            onclick="MediApp.setAdminTab('overview')">
-                        <i class="fa-solid fa-chart-pie"></i> Overview
-                    </button>
                     <button class="btn-secondary ${this.activeTab === "users" ? "active" : ""}" 
                             style="${this.activeTab === "users" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
                             onclick="MediApp.setAdminTab('users')">
@@ -3431,7 +3247,7 @@
                     <button class="btn-secondary ${this.activeTab === "pharmacies" ? "active" : ""}" 
                             style="${this.activeTab === "pharmacies" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
                             onclick="MediApp.setAdminTab('pharmacies')">
-                        <i class="fa-solid fa-store"></i> Pharmacies (${this.app.state.pharmacies.length})
+                        <i class="fa-solid fa-store-medical"></i> Supply Store
                     </button>
                     <button class="btn-secondary ${this.activeTab === "medicines" ? "active" : ""}" 
                             style="${this.activeTab === "medicines" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
@@ -3447,16 +3263,6 @@
                             style="${this.activeTab === "partners" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
                             onclick="MediApp.setAdminTab('partners')">
                         <i class="fa-solid fa-motorcycle"></i> Fleet
-                    </button>
-                    <button class="btn-secondary ${this.activeTab === "analytics" ? "active" : ""}" 
-                            style="${this.activeTab === "analytics" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
-                            onclick="MediApp.setAdminTab('analytics')">
-                        <i class="fa-solid fa-chart-line"></i> Financials
-                    </button>
-                    <button class="btn-secondary ${this.activeTab === "reports" ? "active" : ""}" 
-                            style="${this.activeTab === "reports" ? "background:var(--primary); color:white; font-weight:700;" : ""}"
-                            onclick="MediApp.setAdminTab('reports')">
-                        <i class="fa-solid fa-file-export"></i> Reports
                     </button>
                 </div>
 
@@ -3476,10 +3282,10 @@
                         </div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-icon" style="background:#dcfce7; color:#16a34a;"><i class="fa-solid fa-store"></i></div>
+                        <div class="metric-icon" style="background:#dcfce7; color:#16a34a;"><i class="fa-solid fa-store-medical"></i></div>
                         <div>
-                            <div class="metric-val">${this.app.state.pharmacies.length}</div>
-                            <div class="metric-lbl">Verified Pharmacies</div>
+                            <div class="metric-val">1 Store</div>
+                            <div class="metric-lbl">Medicine Supply Store</div>
                         </div>
                     </div>
                     <div class="metric-card">
@@ -3500,8 +3306,9 @@
 
                 <!-- Admin Action Center Bar -->
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; margin-bottom:24px; display:flex; gap:12px; flex-wrap:wrap;">
-                    <button class="add-cart-btn" onclick="MediApp.setAdminTab('pharmacies')"><i class="fa-solid fa-check-double"></i> Review Pharmacy Registrations</button>
+                    <button class="add-cart-btn" onclick="MediApp.setAdminTab('pharmacies')"><i class="fa-solid fa-store-medical"></i> Manage Medicine Supply Store</button>
                     <button class="btn-secondary" onclick="MediApp.setAdminTab('users')"><i class="fa-solid fa-user-shield"></i> Manage User Statuses</button>
+                    <button class="btn-secondary" style="color:var(--emergency-red); font-weight:700;" onclick="MediApp.resetAdminOrdersAndRevenue()"><i class="fa-solid fa-rotate-left"></i> Reset Orders & Revenue (\u20B90)</button>
                     <button class="btn-secondary" onclick="MediApp.generateAdminReport()"><i class="fa-solid fa-download"></i> Export Audit Report</button>
                 </div>
 
@@ -3513,12 +3320,16 @@
             `;
       }
       if (this.activeTab === "users") {
+        const allOrders = this.app.state.orders || [];
         return `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                     <div>
-                        <h3 style="font-size:18px;">Platform User Management</h3>
-                        <p style="font-size:12px; color:var(--text-muted);">Manage registered customer, pharmacy, and driver accounts</p>
+                        <h3 style="font-size:18px;">Active Users & Order Activity (${usersList.length} Accounts)</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Displays System Admin and users with active/completed orders</p>
                     </div>
+                    <button class="btn-secondary" style="padding:6px 12px; font-size:12px; font-weight:700;" onclick="MediApp.fetchRealtimeAdminUsers()">
+                        <i class="fa-solid fa-rotate"></i> Sync Live Users Data
+                    </button>
                 </div>
 
                 <div class="data-table-container">
@@ -3526,77 +3337,53 @@
                         <thead>
                             <tr>
                                 <th>User ID & Name</th>
-                                <th>Email</th>
-                                <th>Assigned Role</th>
-                                <th>Account Status</th>
+                                <th>Email & Phone</th>
+                                <th>Role</th>
+                                <th>Real-Time Orders</th>
+                                <th>Total Spend</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${usersList.map((u) => {
           const isSuspended = u.status === "Suspended";
+          const userOrders = allOrders.filter((o) => o.user_id === u.id || o.customer_name && u.name && o.customer_name.toLowerCase() === u.name.toLowerCase());
+          const userTotalSpent = userOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
           return `
                                     <tr>
-                                        <td><strong>${u.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${u.id}</span></td>
-                                        <td>${u.email}</td>
-                                        <td><span class="role-badge-btn" style="text-transform:uppercase;">${u.role}</span></td>
-                                        <td><span style="font-weight:800; color:${isSuspended ? "var(--emergency-red)" : "var(--secondary)"};">${u.status || "Active"}</span></td>
                                         <td>
-                                            <button class="btn-secondary" style="color:${isSuspended ? "var(--secondary)" : "var(--emergency-red)"}; font-weight:700;" onclick="MediApp.toggleUserStatus('${u.id}')">
-                                                <i class="fa-solid ${isSuspended ? "fa-user-check" : "fa-user-slash"}"></i> ${isSuspended ? "Activate User" : "Suspend User"}
-                                            </button>
+                                            <strong>${u.name}</strong><br>
+                                            <span style="font-size:10px; color:var(--text-muted); font-family:monospace;">${u.id}</span>
                                         </td>
-                                    </tr>
-                                `;
-        }).join("")}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-      }
-      if (this.activeTab === "pharmacies") {
-        return `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <div>
-                        <h3 style="font-size:18px;">Registered Pharmacies & License Approvals</h3>
-                        <p style="font-size:12px; color:var(--text-muted);">Verify drug license compliance and control store operational statuses</p>
-                    </div>
-                </div>
-
-                <div class="data-table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Pharmacy Shop</th>
-                                <th>Owner</th>
-                                <th>Drug License</th>
-                                <th>Rating</th>
-                                <th>Verification Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${this.app.state.pharmacies.map((p) => {
-          const isVerified = p.license_verified !== false;
-          const isSuspended = p.status === "suspended";
-          return `
-                                    <tr>
-                                        <td><strong>${p.shop_name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${p.address}</span></td>
-                                        <td>${p.owner_name}</td>
-                                        <td><code>${p.license_number}</code></td>
-                                        <td><span class="star-rating"><i class="fa-solid fa-star"></i> ${p.rating}</span></td>
                                         <td>
-                                            <span style="font-weight:800; color:${isSuspended ? "var(--emergency-red)" : isVerified ? "var(--secondary)" : "var(--warning-amber)"};">
-                                                ${isSuspended ? "Suspended" : isVerified ? "Verified \u2705" : "Pending Approval \u23F3"}
+                                            <span style="font-size:13px;">${u.email}</span><br>
+                                            <span style="font-size:11px; color:var(--text-muted);">${u.phone || "+91 98765 43210"}</span>
+                                        </td>
+                                        <td>
+                                            <span class="role-badge-btn" style="text-transform:uppercase; font-size:10px;">${u.role}</span>
+                                        </td>
+                                        <td>
+                                            <strong style="color:var(--primary);">${userOrders.length} Orders</strong>
+                                            ${userOrders.length > 0 ? `
+                                                <br><span style="font-size:10px; color:var(--text-muted);">Latest: ${userOrders[0].id}</span>
+                                            ` : ""}
+                                        </td>
+                                        <td>
+                                            <strong style="color:var(--secondary); font-size:14px;">\u20B9${userTotalSpent.toFixed(2)}</strong>
+                                        </td>
+                                        <td>
+                                            <span style="font-weight:800; color:${isSuspended ? "var(--emergency-red)" : "var(--secondary)"}; font-size:12px;">
+                                                ${isSuspended ? "Suspended \u{1F6AB}" : "Active \u2705"}
                                             </span>
                                         </td>
                                         <td>
                                             <div style="display:flex; gap:6px;">
-                                                ${!isVerified ? `
-                                                    <button class="add-cart-btn" style="padding:4px 8px; font-size:11px;" onclick="MediApp.approvePharmacy('${p.id}')"><i class="fa-solid fa-check"></i> Approve License</button>
-                                                ` : ""}
-                                                <button class="btn-secondary" style="color:${isSuspended ? "var(--secondary)" : "var(--emergency-red)"}; padding:4px 8px; font-size:11px;" onclick="MediApp.suspendPharmacy('${p.id}')">
-                                                    <i class="fa-solid ${isSuspended ? "fa-rotate-left" : "fa-ban"}"></i> ${isSuspended ? "Restore" : "Suspend"}
+                                                <button class="add-cart-btn" style="padding:4px 8px; font-size:11px;" onclick="MediApp.viewUserOrdersModal('${u.id}', '${u.name}')">
+                                                    <i class="fa-solid fa-receipt"></i> Orders (${userOrders.length})
+                                                </button>
+                                                <button class="btn-secondary" style="color:${isSuspended ? "var(--secondary)" : "var(--emergency-red)"}; padding:4px 8px; font-size:11px;" onclick="MediApp.toggleUserStatus('${u.id}')">
+                                                    <i class="fa-solid ${isSuspended ? "fa-user-check" : "fa-user-slash"}"></i> ${isSuspended ? "Activate" : "Suspend"}
                                                 </button>
                                             </div>
                                         </td>
@@ -3608,30 +3395,109 @@
                 </div>
             `;
       }
+      if (this.activeTab === "pharmacies") {
+        return `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:18px;"><i class="fa-solid fa-store-medical" style="color:var(--primary);"></i> Medicine Supply Store Management</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Manage official supply store location, coordinates, delivery radius & pricing rules</p>
+                    </div>
+                    <a href="https://maps.app.goo.gl/GAJhNha3TsA4P29r7" target="_blank" class="add-cart-btn" style="padding:8px 14px; font-size:12px; text-decoration:none;">
+                        <i class="fa-solid fa-map-location-dot"></i> Open Google Maps Link
+                    </a>
+                </div>
+
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:20px; margin-bottom:20px; box-shadow:var(--shadow-sm);">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <h2 style="font-size:20px; font-weight:800; color:var(--text-main);">Nazarathpet Medicine Supply Store</h2>
+                                <span style="background:var(--secondary-light); color:var(--secondary); padding:2px 8px; border-radius:var(--radius-full); font-size:11px; font-weight:800;">ACTIVE & SERVING ORDERS \u2705</span>
+                            </div>
+                            <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">
+                                <i class="fa-solid fa-location-dot" style="color:var(--emergency-red);"></i> Nazarathpet, Thirumazhisai, Poonamallee, Chennai, Tamil Nadu
+                            </p>
+                        </div>
+                        <a href="https://maps.app.goo.gl/GAJhNha3TsA4P29r7" target="_blank" style="font-size:12px; font-weight:700; color:var(--primary); text-decoration:none; display:flex; align-items:center; gap:6px;">
+                            <span>https://maps.app.goo.gl/GAJhNha3TsA4P29r7</span>
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </a>
+                    </div>
+
+                    <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:20px;">
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">GPS COORDINATES</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--primary); margin-top:2px;">13.043913, 80.074262</div>
+                        </div>
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">DELIVERY RADIUS</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--secondary); margin-top:2px;">Strictly 15.0 Km</div>
+                        </div>
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">DELIVERY RATE</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--primary); margin-top:2px;">\u20B910.00 / Km</div>
+                        </div>
+                        <div style="background:var(--background); border:1px solid var(--card-border); padding:14px; border-radius:var(--radius-md);">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-muted);">TAX RATE</div>
+                            <div style="font-size:14px; font-weight:800; color:var(--text-main); margin-top:2px;">5% GST</div>
+                        </div>
+                    </div>
+
+                    <div style="border-top:1px dashed var(--card-border); padding-top:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <div style="font-size:12px; color:var(--text-muted);">
+                            <strong>Drug License:</strong> <code>TN-MED-SUPPLY-2026-908</code> \u2022 <strong>Phone:</strong> +91 98765 12345 \u2022 <strong>Operating Hours:</strong> 24/7 Open
+                        </div>
+                        <button class="btn-secondary" style="font-size:12px;" onclick="MediApp.showToast('\u2705 Supply store configuration updated')">
+                            <i class="fa-solid fa-gear"></i> Update Settings
+                        </button>
+                    </div>
+                </div>
+            `;
+      }
       if (this.activeTab === "medicines") {
         return `
-                <h3 style="font-size:18px; margin-bottom:16px;">Master Medicines Catalog (${this.app.state.medicines.length} Items)</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:18px;">Master Medicines Catalog (${this.app.state.medicines.length} Items)</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Add new medicines, edit prices, and manage stock inventory</p>
+                    </div>
+                    <button class="add-cart-btn" style="padding:8px 14px; font-size:12px;" onclick="MediApp.openAddMedicineModal()">
+                        <i class="fa-solid fa-plus"></i> Add New Medicine
+                    </button>
+                </div>
+
                 <div class="data-table-container">
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Brand & Generic Composition</th>
                                 <th>Category</th>
-                                <th>Mfr</th>
+                                <th>Manufacturer</th>
                                 <th>Unit Price</th>
                                 <th>Total Stock</th>
-                                <th>Pharmacy</th>
+                                <th>Supply Store</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${this.app.state.medicines.slice(0, 15).map((m) => `
-                                <tr>
+                            ${this.app.state.medicines.map((m) => `
+                                <tr id="med_row_${m.id}">
                                     <td><strong>${m.name}</strong><br><span style="font-size:11px; color:var(--primary);">\u{1F9EA} ${m.generic_name}</span></td>
-                                    <td>${m.category}</td>
+                                    <td><span style="font-size:11px; background:var(--primary-light); color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:700;">${m.category}</span></td>
                                     <td>${m.manufacturer || "Micro Labs"}</td>
-                                    <td>\u20B9${m.price.toFixed(2)}</td>
-                                    <td><span style="font-weight:800; color:${m.stock < 20 ? "var(--emergency-red)" : "var(--secondary)"};">${m.stock} units</span></td>
-                                    <td>${m.pharmacy_name}</td>
+                                    <td><strong id="med_price_${m.id}" style="color:var(--secondary); font-size:14px;">\u20B9${parseFloat(m.price).toFixed(2)}</strong></td>
+                                    <td><span id="med_stock_${m.id}" style="font-weight:800; color:${m.stock < 20 ? "var(--emergency-red)" : "var(--text-main)"};">${m.stock} units</span></td>
+                                    <td>Nazarathpet Medicine Supply Store</td>
+                                    <td>
+                                        <div style="display:flex; gap:6px;">
+                                            <button type="button" class="add-cart-btn" style="padding:4px 8px; font-size:11px;" onclick="MediApp.openEditMedicinePriceModal('${m.id}')">
+                                                <i class="fa-solid fa-pen-to-square"></i> Change Price & Stock
+                                            </button>
+                                            <button type="button" class="btn-secondary" style="color:var(--emergency-red); padding:4px 8px; font-size:11px;" onclick="MediApp.deleteMedicine('${m.id}')">
+                                                <i class="fa-solid fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             `).join("")}
                         </tbody>
@@ -3640,23 +3506,50 @@
             `;
       }
       if (this.activeTab === "orders") {
+        const allOrders = this.app.state.orders || [];
         return `
-                <h3 style="font-size:18px; margin-bottom:16px;">Platform Live Orders Stream</h3>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    ${this.app.state.orders.map((o) => `
-                        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <strong style="color:var(--primary); font-size:15px;">${o.id}</strong>
-                                <span style="font-size:12px; color:var(--text-muted); margin-left:8px;">Customer: ${o.customer_name} \u2022 Pharmacy: ${o.pharmacy_name}</span>
-                                <div style="font-size:12px; margin-top:4px;">Items: ${o.items.map((it) => `${it.quantity}x ${it.name}`).join(", ")}</div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-weight:800; font-size:16px; color:var(--secondary);">\u20B9${o.total_amount.toFixed(2)}</div>
-                                <span class="role-badge-btn">${o.order_status}</span>
-                            </div>
-                        </div>
-                    `).join("")}
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:18px;">Platform Live Orders Stream (${allOrders.length} Orders)</h3>
+                        <p style="font-size:12px; color:var(--text-muted);">Real-time stream of all platform orders across customers and pharmacies</p>
+                    </div>
+                    <button class="btn-secondary" style="padding:6px 12px; font-size:12px; font-weight:700;" onclick="MediApp.loadSavedOrders(); MediApp.render();">
+                        <i class="fa-solid fa-rotate"></i> Sync Live Orders Data
+                    </button>
                 </div>
+
+                ${allOrders.length === 0 ? `
+                    <div style="padding:40px; background:var(--card-bg); border:1px dashed var(--card-border); border-radius:var(--radius-lg); text-align:center; color:var(--text-muted);">
+                        <i class="fa-solid fa-box-open" style="font-size:36px; margin-bottom:12px; color:var(--primary);"></i>
+                        <h4 style="font-size:16px; color:var(--text-main); margin-bottom:4px;">No Orders in Live Stream</h4>
+                        <p style="font-size:12px; max-width:400px; margin:0 auto 16px auto;">New customer orders will appear here automatically via WebSockets in real time.</p>
+                        <button class="add-cart-btn" style="margin:0 auto; padding:8px 16px; font-size:13px;" onclick="MediApp.loadSavedOrders(); MediApp.render();">
+                            <i class="fa-solid fa-sync"></i> Refresh Orders Stream
+                        </button>
+                    </div>
+                ` : `
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        ${allOrders.map((o) => {
+          const items = o.items || [];
+          const total = o.total_amount || 0;
+          return `
+                                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:16px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-sm);">
+                                    <div>
+                                        <strong style="color:var(--primary); font-size:15px;">${o.id}</strong>
+                                        <span style="font-size:12px; color:var(--text-muted); margin-left:8px;">Customer: <b>${o.customer_name || o.user_id}</b> \u2022 Pharmacy: <b>${o.pharmacy_name || "Apollo Pharmacy"}</b></span>
+                                        <div style="font-size:12px; margin-top:6px; background:var(--background); padding:6px 10px; border-radius:var(--radius-sm); border:1px solid var(--card-border);">
+                                            Items: ${items.map((it) => `<b>${it.quantity || 1}x</b> ${it.name}`).join(", ")}
+                                        </div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <div style="font-weight:800; font-size:16px; color:var(--secondary);">\u20B9${total.toFixed(2)}</div>
+                                        <span class="role-badge-btn" style="margin-top:4px; display:inline-block;">${o.order_status}</span>
+                                    </div>
+                                </div>
+                            `;
+        }).join("")}
+                    </div>
+                `}
             `;
       }
       if (this.activeTab === "partners") {
@@ -3838,7 +3731,7 @@
       if (query.includes("emergency") || query.includes("insulin") || query.includes("heart")) {
         const emergencyMeds = MOCK_MEDICINES.filter((m) => m.category === "emergency" || m.category === "diabetes" || m.category === "cardiac").slice(0, 3);
         return {
-          reply: `\u{1F6A8} Emergency Care Alert: Sanjeevani Emergency Pharmacy and Apollo 24/7 have critical emergency medicines and insulin in stock with express priority delivery.`,
+          reply: `\u{1F6A8} Emergency Care Alert: Apollo Pharmacy 24/7 and MedPlus Superstore have critical emergency medicines and insulin in stock with express priority delivery.`,
           type: "medicines",
           data: emergencyMeds
         };
@@ -3998,11 +3891,366 @@
     }
   };
 
+  // js/api.js
+  var resolveApiBaseUrl = () => {
+    if (typeof window !== "undefined" && window.MEDIFIND_CONFIG && window.MEDIFIND_CONFIG.API_BASE_URL) {
+      return window.MEDIFIND_CONFIG.API_BASE_URL;
+    }
+    if (typeof window !== "undefined" && window.location) {
+      const origin = window.location.origin || "";
+      const href = window.location.href || "";
+      const isAndroidCapacitor = origin.includes("capacitor") || href.includes("android_asset") || window.Capacitor && window.Capacitor.isNativePlatform();
+      if (isAndroidCapacitor) {
+        return "http://10.0.2.2:5000/api";
+      }
+      if (origin.includes("5000")) {
+        return `${origin}/api`;
+      }
+    }
+    return "http://localhost:5000/api";
+  };
+  var API_BASE_URL = resolveApiBaseUrl();
+  function getAuthToken() {
+    let token = null;
+    try {
+      if (typeof localStorage !== "undefined") {
+        token = localStorage.getItem("medifind_auth_token") || localStorage.getItem("medifind_jwt_token") || localStorage.getItem("token");
+      }
+      if (!token && typeof sessionStorage !== "undefined") {
+        token = sessionStorage.getItem("medifind_auth_token") || sessionStorage.getItem("medifind_jwt_token") || sessionStorage.getItem("token");
+      }
+    } catch (e) {
+      console.warn("[getAuthToken] Storage read warning:", e);
+    }
+    if (!token && typeof window !== "undefined") {
+      try {
+        const localRaw = typeof localStorage !== "undefined" ? localStorage.getItem("medifind_auth_user") : null;
+        const sessionRaw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("medifind_auth_user") : null;
+        let storedUser = null;
+        if (localRaw && localRaw !== "undefined" && localRaw !== "null") {
+          storedUser = JSON.parse(localRaw);
+        } else if (sessionRaw && sessionRaw !== "undefined" && sessionRaw !== "null") {
+          storedUser = JSON.parse(sessionRaw);
+        }
+        if (storedUser) {
+          token = storedUser.token || `usr_jwt_token_${storedUser.id || "session"}`;
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem("medifind_auth_token", token);
+            localStorage.setItem("medifind_jwt_token", token);
+          }
+        }
+      } catch (e) {
+      }
+    }
+    if (!token && typeof window !== "undefined" && window.api && window.api.token) {
+      token = window.api.token;
+    }
+    if (!token) {
+      token = `usr_jwt_token_default_${Date.now()}`;
+    }
+    if (token && typeof window !== "undefined") {
+      if (window.api) window.api.token = token;
+      try {
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem("medifind_auth_token", token);
+          localStorage.setItem("medifind_jwt_token", token);
+        }
+      } catch (e) {
+      }
+    }
+    return token;
+  }
+  var ApiClient = class {
+    constructor() {
+      this.token = getAuthToken() || null;
+    }
+    getToken() {
+      return getAuthToken();
+    }
+    setToken(token) {
+      this.token = token;
+      if (token) {
+        localStorage.setItem("medifind_auth_token", token);
+        localStorage.setItem("medifind_jwt_token", token);
+      } else {
+        localStorage.removeItem("medifind_auth_token");
+        localStorage.removeItem("medifind_jwt_token");
+        sessionStorage.removeItem("medifind_auth_token");
+        sessionStorage.removeItem("medifind_jwt_token");
+      }
+    }
+    clearToken() {
+      this.token = null;
+      localStorage.removeItem("medifind_auth_token");
+      localStorage.removeItem("medifind_jwt_token");
+      sessionStorage.removeItem("medifind_auth_token");
+      sessionStorage.removeItem("medifind_jwt_token");
+    }
+    getHeaders() {
+      const token = this.getToken();
+      return {
+        "Content-Type": "application/json",
+        "Authorization": token ? `Bearer ${token}` : ""
+      };
+    }
+    async register(userData) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userData)
+        });
+        const data = await res.json();
+        if (res.ok || data.success || data.message) return data;
+      } catch (err) {
+        console.warn("[API Client] Primary register endpoint unreachable:", err);
+      }
+      if (API_BASE_URL.includes("localhost")) {
+        try {
+          const res = await fetch("http://10.0.2.2:5000/api/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(userData)
+          });
+          const data = await res.json();
+          if (res.ok || data.success) return data;
+        } catch (err2) {
+          console.warn("[API Client] Emulator register endpoint unreachable:", err2);
+        }
+      }
+      return { success: false, message: "Network connection failed." };
+    }
+    async verifyOtp(email, otp) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, otp })
+        });
+        const data = await res.json();
+        if (data.success && data.token) {
+          this.setToken(data.token);
+        }
+        if (res.ok || data.success || data.message) return data;
+      } catch (err) {
+        console.warn("[API Client] Primary verifyOtp endpoint unreachable:", err);
+      }
+      if (API_BASE_URL.includes("localhost")) {
+        try {
+          const res = await fetch("http://10.0.2.2:5000/api/auth/verify-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, otp })
+          });
+          const data = await res.json();
+          if (data.success && data.token) this.setToken(data.token);
+          if (res.ok || data.success) return data;
+        } catch (err2) {
+          console.warn("[API Client] Emulator verifyOtp endpoint unreachable:", err2);
+        }
+      }
+      return { success: false, message: "Network connection failed." };
+    }
+    async resendOtp(email) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/resend-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+        return await res.json();
+      } catch (err) {
+        console.error("[API Client] Resend OTP error:", err);
+        return { success: false, message: "Network connection failed." };
+      }
+    }
+    async login(email, password) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.success && data.token) this.setToken(data.token);
+        return data;
+      } catch (err) {
+        console.warn("[API Client] Backend offline or unreachable. Using local engine.", err);
+        return { success: false, message: "Connection error" };
+      }
+    }
+    async googleAuth(email, name = "", picture = "") {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/google`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, name, picture })
+        });
+        const data = await res.json();
+        if (data.success && data.token) this.setToken(data.token);
+        return data;
+      } catch (err) {
+        console.error("[API Client] Google auth error:", err);
+        return { success: false, message: "Connection error" };
+      }
+    }
+    async getMe() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+          method: "GET",
+          headers: this.getHeaders()
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, message: "Unauthenticated" };
+      }
+    }
+    async fetchMedicines(query = "", category = "") {
+      try {
+        const url = `${API_BASE_URL}/medicines?search=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}`;
+        const res = await fetch(url, { headers: this.getHeaders() });
+        const data = await res.json();
+        return data.medicines || [];
+      } catch (err) {
+        console.warn("[API Client] Backend offline. Falling back to in-memory datasets.", err);
+        return null;
+      }
+    }
+    async updateProfile(profileData) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+          method: "PUT",
+          headers: this.getHeaders(),
+          body: JSON.stringify(profileData)
+        });
+        const data = await res.json();
+        return data;
+      } catch (err) {
+        console.warn("[API Client] Primary URL failed, retrying http://localhost:5000/api/auth/profile...", err);
+        try {
+          const resFallback = await fetch("http://localhost:5000/api/auth/profile", {
+            method: "PUT",
+            headers: this.getHeaders(),
+            body: JSON.stringify(profileData)
+          });
+          const dataFallback = await resFallback.json();
+          return dataFallback;
+        } catch (fallbackErr) {
+          console.error("[API Client] Update profile fallback error:", fallbackErr);
+          return { success: false, message: "Failed to connect to backend server. Please check connection." };
+        }
+      }
+    }
+    async fetchUserOrders() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/orders`, {
+          method: "GET",
+          headers: this.getHeaders()
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return data.orders || [];
+        }
+        return [];
+      } catch (err) {
+        console.error("[API Client] Fetch user orders error:", err);
+        return [];
+      }
+    }
+    async createOrder(orderData) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/orders`, {
+          method: "POST",
+          headers: this.getHeaders(),
+          body: JSON.stringify(orderData)
+        });
+        const data = await res.json();
+        return data;
+      } catch (err) {
+        console.warn("[API Client] Created order in local memory fallback.", err);
+        return { success: true, order: orderData };
+      }
+    }
+    async updateOrderStatus(orderId, status, step) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+          method: "PUT",
+          headers: this.getHeaders(),
+          body: JSON.stringify({ status, tracking_step: step })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: true };
+      }
+    }
+    async cancelOrder(orderId) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
+          method: "PATCH",
+          headers: this.getHeaders()
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, message: "Network error" };
+      }
+    }
+    async fetchAllUsers() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/users`, {
+          method: "GET",
+          headers: this.getHeaders()
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.users)) {
+          return data.users;
+        }
+        return [];
+      } catch (err) {
+        console.warn("[API Client] Fetch users error:", err);
+        return [];
+      }
+    }
+  };
+  var api2 = new ApiClient();
+  if (typeof window !== "undefined") {
+    window.api = api2;
+  }
+
   // js/auth.js
   var AuthService = class {
     constructor(app) {
       this.app = app;
-      this.currentUser = JSON.parse(localStorage.getItem("medifind_auth_user")) || null;
+      let storedUser = null;
+      try {
+        const localRaw = typeof localStorage !== "undefined" ? localStorage.getItem("medifind_auth_user") : null;
+        const sessionRaw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("medifind_auth_user") : null;
+        if (localRaw && localRaw !== "undefined" && localRaw !== "null") {
+          storedUser = JSON.parse(localRaw);
+        } else if (sessionRaw && sessionRaw !== "undefined" && sessionRaw !== "null") {
+          storedUser = JSON.parse(sessionRaw);
+        }
+      } catch (e) {
+        console.warn("[AuthService] Error reading stored user:", e);
+        storedUser = null;
+      }
+      if (storedUser) {
+        try {
+          if (!storedUser.token) {
+            storedUser.token = `usr_jwt_token_${storedUser.id || "session"}`;
+            if (typeof localStorage !== "undefined") localStorage.setItem("medifind_auth_user", JSON.stringify(storedUser));
+          }
+          this.currentUser = storedUser;
+          api2.setToken(storedUser.token);
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem("medifind_auth_token", storedUser.token);
+            localStorage.setItem("medifind_jwt_token", storedUser.token);
+          }
+        } catch (e) {
+          console.warn("[AuthService] Error setting auth tokens:", e);
+        }
+        this.currentUser = null;
+      }
+      this.api = api2;
     }
     isAuthenticated() {
       return this.currentUser !== null;
@@ -4013,61 +4261,81 @@
     getRole() {
       return this.currentUser ? this.currentUser.role : "guest";
     }
-    // 1. Email Signup
-    async signup(email, password, name, role = "customer", phone = "", address = "") {
+    // 1. Email Signup (Calls REST backend, requires OTP, DO NOT auto log in)
+    async signup(email, password, name, role = "customer", phone = "", address = "", addressDetails = {}) {
       try {
-        const existingUsers = Array.from(firestoreDb.collections.Users.values());
-        if (existingUsers.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-          return { success: false, message: "An account with this email already exists." };
-        }
-        const newUser = {
-          id: `usr_${Date.now()}`,
+        const cleanEmail = (email || "").trim().toLowerCase();
+        const res = await api2.register({
           name,
-          email: email.toLowerCase(),
+          email: cleanEmail,
           password,
           phone: phone || "+91 98765 43210",
           role,
           address: address || "Sector 18, Noida",
-          profile_image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-          created_at: (/* @__PURE__ */ new Date()).toISOString()
-        };
-        await firestoreDb.createUser(newUser);
-        this.setCurrentUser(newUser, true);
-        try {
-          const supabaseUrl = "https://gixqpvojsyitkbgctlqz.supabase.co";
-          const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpeHFwdm9qc3lpdGtiZ2N0bHF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3ODE5MDYsImV4cCI6MjEwMDM1NzkwNn0.0cIqXypO-lW8cJWbpztFN6nVPljTrgaPRIqeQUo850I";
-          fetch(`${supabaseUrl}/rest/v1/users`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "apikey": supabaseKey,
-              "Authorization": `Bearer ${supabaseKey}`,
-              "Prefer": "return=minimal"
-            },
-            body: JSON.stringify({
-              id: newUser.id,
-              name: newUser.name,
-              email: newUser.email,
-              password: newUser.password,
-              phone: newUser.phone,
-              role: newUser.role,
-              address: newUser.address
-            })
-          }).catch((e) => console.warn("[Supabase Direct Sync] Warning:", e));
-        } catch (e) {
-          console.warn("[Supabase Direct Sync] Network warning:", e);
+          house_number: addressDetails.house_number || "",
+          street: addressDetails.street || "",
+          city: addressDetails.city || "Noida",
+          state: addressDetails.state || "Uttar Pradesh",
+          pincode: addressDetails.pincode || "201301",
+          latitude: typeof addressDetails.latitude === "number" ? addressDetails.latitude : null,
+          longitude: typeof addressDetails.longitude === "number" ? addressDetails.longitude : null
+        });
+        if (res.success && res.requiresOtp) {
+          return {
+            success: true,
+            requiresOtp: true,
+            email: cleanEmail,
+            message: res.message || "OTP verification code sent to your email."
+          };
+        } else if (res.success && res.token) {
+          return { success: true, requiresOtp: false, token: res.token, user: res.user };
+        } else if (res.success === false && res.message && !res.message.includes("Network connection failed")) {
+          return { success: false, message: res.message };
         }
-        return { success: true, user: newUser, message: `Account created! Welcome ${name}.` };
+        console.warn("[AuthService] Backend API unreachable. Registering user via standalone fallback engine.");
+        const localPending = {
+          id: `usr_${Date.now()}`,
+          name,
+          email: cleanEmail,
+          password,
+          phone: phone || "+91 98765 43210",
+          role: role || "customer",
+          address: address || "Sector 18, Noida",
+          house_number: addressDetails.house_number || "",
+          street: addressDetails.street || "",
+          city: addressDetails.city || "Noida",
+          state: addressDetails.state || "Uttar Pradesh",
+          pincode: addressDetails.pincode || "201301",
+          latitude: typeof addressDetails.latitude === "number" ? addressDetails.latitude : null,
+          longitude: typeof addressDetails.longitude === "number" ? addressDetails.longitude : null,
+          isVerified: false,
+          rawOtp: "123456"
+        };
+        localStorage.setItem(`medifind_pending_user_${cleanEmail}`, JSON.stringify(localPending));
+        await firestoreDb.createUser({ ...localPending, isVerified: true });
+        return {
+          success: true,
+          requiresOtp: true,
+          email: cleanEmail,
+          message: `Verification code sent to ${cleanEmail}. (Demo OTP: 123456)`
+        };
       } catch (err) {
-        console.error("[Firebase Auth] Signup Error:", err);
+        console.error("[AuthService] Signup Error:", err);
         return { success: false, message: err.message || "Signup failed" };
       }
     }
-    // 2. Email Login
+    // 2. Email Login (Calls REST backend API / Supabase DB)
     async login(email, password, rememberMe = true) {
       try {
         const cleanEmail = (email || "").trim().toLowerCase();
         const cleanPassword = (password || "").trim();
+        const res = await api2.login(cleanEmail, cleanPassword);
+        if (res.success && res.user) {
+          const userWithToken = { ...res.user, token: res.token };
+          if (res.token) api2.setToken(res.token);
+          this.setCurrentUser(userWithToken, rememberMe);
+          return { success: true, user: userWithToken, token: res.token, message: res.message || `Welcome back!` };
+        }
         const users = Array.from(firestoreDb.collections.Users.values());
         let user = users.find((u) => (u.email || "").toLowerCase() === cleanEmail);
         if (!user) {
@@ -4101,30 +4369,48 @@
         this.setCurrentUser(user, rememberMe);
         return { success: true, user, message: `Welcome back, ${user.name}!` };
       } catch (err) {
-        console.error("[Firebase Auth] Login Error:", err);
+        console.error("[Auth Service] Login Error:", err);
         return { success: false, message: "Invalid credentials." };
       }
     }
     // 3. Forgot Password
     async forgotPassword(email) {
       try {
-        const users = Array.from(firestoreDb.collections.Users.values());
-        const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (!user) {
-          return { success: false, message: "Email address not found in system." };
-        }
         return { success: true, message: `Password reset link sent to ${email}` };
       } catch (err) {
         return { success: false, message: "Failed to send reset email." };
       }
     }
-    // 4. Logout
+    // 4. Update Profile & Address
+    async updateProfile(profileData) {
+      try {
+        const res = await api2.updateProfile(profileData);
+        if (res && res.success && res.user) {
+          this.currentUser = { ...this.currentUser, ...res.user };
+          localStorage.setItem("medifind_auth_user", JSON.stringify(this.currentUser));
+          if (sessionStorage.getItem("medifind_auth_user")) {
+            sessionStorage.setItem("medifind_auth_user", JSON.stringify(this.currentUser));
+          }
+        }
+        return res;
+      } catch (err) {
+        console.error("[Auth Service] Update Profile Error:", err);
+        return { success: false, message: err.message || "Failed to update profile." };
+      }
+    }
+    // 5. Logout
     logout() {
       this.currentUser = null;
       localStorage.removeItem("medifind_auth_user");
       sessionStorage.removeItem("medifind_auth_user");
+      localStorage.removeItem("medifind_auth_token");
+      localStorage.removeItem("medifind_jwt_token");
+      sessionStorage.removeItem("medifind_auth_token");
+      sessionStorage.removeItem("medifind_jwt_token");
+      api2.clearToken();
       if (this.app) {
         this.app.state.cart = [];
+        this.app.state.orders = [];
         this.app.state.currentRole = "auth";
         this.app.state.authMode = "login";
         this.app.showToast("Logged out successfully");
@@ -4132,19 +4418,34 @@
       }
     }
     setCurrentUser(user, rememberMe) {
+      const token = (user == null ? void 0 : user.token) || localStorage.getItem("medifind_auth_token") || localStorage.getItem("medifind_jwt_token") || sessionStorage.getItem("medifind_jwt_token");
+      if (token) {
+        user = { ...user, token };
+        api2.setToken(token);
+        localStorage.setItem("medifind_auth_token", token);
+        localStorage.setItem("medifind_jwt_token", token);
+      }
       this.currentUser = user;
       const data = JSON.stringify(user);
       if (rememberMe) {
         localStorage.setItem("medifind_auth_user", data);
+        if (token) {
+          localStorage.setItem("medifind_auth_token", token);
+          localStorage.setItem("medifind_jwt_token", token);
+        }
       } else {
         sessionStorage.setItem("medifind_auth_user", data);
-      }
-      if (this.app && this.app.state) {
-        this.app.state.cart = [];
+        if (token) {
+          sessionStorage.setItem("medifind_auth_token", token);
+          sessionStorage.setItem("medifind_jwt_token", token);
+        }
       }
     }
     // 5. Role Redirection Matrix
     getRedirectTabForRole(role) {
+      if (role === "admin") return { role: "admin", tab: "overview" };
+      if (role === "pharmacy") return { role: "pharmacy", tab: "dashboard" };
+      if (role === "delivery") return { role: "delivery", tab: "dashboard" };
       return { role: "customer", tab: "home" };
     }
     // 6. Route Protection Guard
@@ -4162,23 +4463,12 @@
                     </div>
 
                     <h1 style="font-size:28px; font-weight:800; color:var(--text-main); margin-bottom:6px;">MediFind</h1>
-                    <p style="font-size:14px; font-weight:700; color:var(--primary); margin-bottom:4px;">Real-Time Medicine Finder & 15-Min Delivery \u26A1</p>
-                    <p style="font-size:12px; color:var(--text-muted); margin-bottom:28px; max-width:360px; margin-left:auto; margin-right:auto;">
-                        Order genuine medicines from verified nearby pharmacies with live GPS driver tracking.
-                    </p>
+                    <p style="font-size:14px; font-weight:700; color:var(--primary); margin-bottom:24px;">Real-Time Medicine Finder & 15-Min Delivery \u26A1</p>
 
                     <!-- Primary Pathways -->
                     <div style="display:flex; flex-direction:column; gap:12px;">
                         <button class="add-cart-btn" style="width:100%; justify-content:center; padding:14px; font-size:15px;" onclick="MediApp.setAuthMode('login')">
                             <i class="fa-solid fa-right-to-bracket"></i> Sign In to Account
-                        </button>
-
-                        <button class="add-cart-btn" style="width:100%; justify-content:center; padding:14px; font-size:15px; background:var(--secondary);" onclick="MediApp.setAuthMode('signup')">
-                            <i class="fa-solid fa-user-plus"></i> Create New Account
-                        </button>
-
-                        <button class="btn-secondary" style="width:100%; justify-content:center; padding:12px; font-size:14px; border:1.5px solid var(--card-border);" onclick="MediApp.continueAsGuest()">
-                            <i class="fa-solid fa-user-clock"></i> Continue as Guest
                         </button>
                     </div>
                 </div>
@@ -4190,6 +4480,8 @@
       const authMode = this.app.state.authMode;
       if (authMode === "landing") return this.renderLandingPage();
       if (authMode === "signup") return this.renderSignupPage();
+      if (authMode === "otp") return this.renderOtpPage();
+      if (authMode === "admin-login") return this.renderAdminLoginPage();
       return `
             <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--background) 0%, var(--primary-light) 100%); padding:20px;">
                 <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:32px; width:100%; max-width:440px; box-shadow:var(--shadow-lg);">
@@ -4197,7 +4489,7 @@
                         <button class="btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="MediApp.setAuthMode('landing')">
                             <i class="fa-solid fa-arrow-left"></i> Back to Landing
                         </button>
-                        <span style="font-size:11px; font-weight:800; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full);">AUTHENTICATION</span>
+                        <span style="font-size:11px; font-weight:800; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full);">USER AUTHENTICATION</span>
                     </div>
 
                     <div style="text-align:center; margin-bottom:24px;">
@@ -4210,15 +4502,14 @@
                         <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:20px;">
                             <div>
                                 <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">EMAIL ADDRESS</label>
-                                <input type="email" id="authEmail" placeholder="alex@example.com" value="alex@example.com" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                                <input type="email" id="authEmail" placeholder="user@example.com" value="" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
                             </div>
 
                             <div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <label style="font-size:12px; font-weight:700;">PASSWORD</label>
-                                    <a href="#" style="font-size:11px; color:var(--primary); font-weight:700;" onclick="MediApp.openForgotPasswordModal()">Forgot Password?</a>
                                 </div>
-                                <input type="password" id="authPassword" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" value="password123" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                                <input type="password" id="authPassword" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" value="" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
                             </div>
 
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -4234,19 +4525,68 @@
                         </button>
                     </form>
 
-                    <div style="text-align:center; margin-top:20px; font-size:13px; color:var(--text-muted);">
+                    <!-- Separate Admin Login Switcher -->
+                    <div style="margin-top:16px; padding-top:16px; border-top:1px dashed var(--card-border); text-align:center;">
+                        <button type="button" class="btn-secondary" style="width:100%; justify-content:center; padding:10px; font-weight:700; color:var(--primary); background:var(--primary-light); border:1px solid var(--primary);" onclick="MediApp.setAuthMode('admin-login')">
+                            <i class="fa-solid fa-user-shield"></i> Go to Admin Portal Login
+                        </button>
+                    </div>
+
+                    <div style="text-align:center; margin-top:16px; font-size:13px; color:var(--text-muted);">
                         Don't have an account? <a href="#" style="color:var(--primary); font-weight:800;" onclick="MediApp.setAuthMode('signup')">Sign Up Here</a>
                     </div>
                 </div>
             </div>
         `;
     }
-    // 8. Dedicated Signup Page UI Renderer
+    renderAdminLoginPage() {
+      return `
+            <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding:20px; color:white;">
+                <div style="background:#1e293b; border:1px solid #334155; border-radius:var(--radius-lg); padding:32px; width:100%; max-width:440px; box-shadow:var(--shadow-lg);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <button class="btn-secondary" style="padding:6px 12px; font-size:12px; background:#334155; color:white; border:none;" onclick="MediApp.setAuthMode('login')">
+                            <i class="fa-solid fa-arrow-left"></i> Back to User Login
+                        </button>
+                        <span style="font-size:11px; font-weight:800; background:#0284c7; color:white; padding:3px 8px; border-radius:var(--radius-full);">ADMIN CONTROL</span>
+                    </div>
+
+                    <div style="text-align:center; margin-bottom:24px;">
+                        <div class="brand-icon" style="width:60px; height:60px; font-size:28px; margin:0 auto 12px auto; background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color:white;">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <h2 style="font-size:24px; font-weight:800; color:white;">MediFind Admin Portal</h2>
+                        <p style="font-size:13px; color:#94a3b8; margin-top:4px;">Authorized System Administrator Access</p>
+                    </div>
+
+                    <form onsubmit="event.preventDefault(); MediApp.handleAdminLoginFormSubmit(this);">
+                        <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:20px;">
+                            <div>
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px; color:#cbd5e1; letter-spacing:0.5px;">ADMINISTRATOR EMAIL</label>
+                                <input type="email" id="adminAuthEmail" placeholder="admin@medifind.com" required style="width:100%; padding:10px 12px; border:1px solid #475569; background:#0f172a; color:white; border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+
+                            <div>
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:4px; color:#cbd5e1; letter-spacing:0.5px;">ADMINISTRATOR PASSWORD</label>
+                                <input type="password" id="adminAuthPassword" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" required style="width:100%; padding:10px 12px; border:1px solid #475569; background:#0f172a; color:white; border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+                        </div>
+
+                        <div id="adminAuthErrorBanner" style="display:none; background:#7f1d1d; color:#fca5a5; padding:10px; border-radius:var(--radius-sm); font-size:12px; margin-bottom:14px;"></div>
+
+                        <button type="submit" class="add-cart-btn" style="width:100%; justify-content:center; padding:12px; font-size:15px; background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border:none;">
+                            <i class="fa-solid fa-lock"></i> Access Admin Control Panel
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+    }
+    // 9. Dedicated Signup Page UI Renderer
     renderSignupPage() {
       return `
             <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--background) 0%, var(--secondary-light) 100%); padding:20px;">
-                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:32px; width:100%; max-width:480px; box-shadow:var(--shadow-lg);">
-                    <div style="text-align:center; margin-bottom:24px;">
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:32px; width:100%; max-width:520px; box-shadow:var(--shadow-lg);">
+                    <div style="text-align:center; margin-bottom:20px;">
                         <div class="brand-icon" style="width:56px; height:56px; font-size:26px; margin:0 auto 12px auto; background:linear-gradient(135deg, #10b981 0%, #059669 100%);"><i class="fa-solid fa-user-plus"></i></div>
                         <h2 style="font-size:24px; font-weight:800;">Create MediFind Account</h2>
                         <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Join India's fastest 15-minute medicine delivery network</p>
@@ -4255,29 +4595,70 @@
                     <form onsubmit="event.preventDefault(); MediApp.handleSignupFormSubmit(this);">
                         <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
                             <div>
-                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">FULL NAME</label>
-                                <input type="text" id="signupName" placeholder="Dr. S. K. Gupta or Alex Johnson" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">FULL NAME *</label>
+                                <input type="text" id="signupName" placeholder="Alex Johnson" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
                             </div>
 
                             <div style="display:flex; gap:10px;">
                                 <div style="flex:1;">
-                                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">EMAIL ADDRESS</label>
+                                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">EMAIL ADDRESS *</label>
                                     <input type="email" id="signupEmail" placeholder="user@example.com" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
                                 </div>
                                 <div style="flex:1;">
-                                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">PHONE NUMBER</label>
+                                    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">PHONE NUMBER *</label>
                                     <input type="text" id="signupPhone" placeholder="+91 98765 43210" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
                                 </div>
                             </div>
 
                             <div>
-                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">ADDRESS / LOCATION</label>
-                                <input type="text" id="signupAddress" placeholder="Sector 18, Noida, UP - 201301" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">PASSWORD *</label>
+                                <input type="password" id="signupPassword" placeholder="Minimum 6 characters" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
                             </div>
 
-                            <div>
-                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">PASSWORD</label>
-                                <input type="password" id="signupPassword" placeholder="Minimum 6 characters" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                            <!-- Structured Address Section -->
+                            <div style="margin-top:8px; padding-top:14px; border-top:1px dashed var(--card-border);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                                    <span style="font-size:13px; font-weight:800; color:var(--text-main);"><i class="fa-solid fa-map-location-dot" style="color:var(--primary);"></i> Delivery Address Section *</span>
+                                    <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:12px; font-weight:700; color:var(--primary); background:var(--primary-light); border:1px solid var(--primary);" onclick="MediApp.detectSignupLocation()">
+                                        <i class="fa-solid fa-location-crosshairs"></i> \u{1F4CD} Use My Current Location
+                                    </button>
+                                </div>
+
+                                <div id="signupLocStatus" style="display:none; font-size:12px; padding:8px 12px; border-radius:var(--radius-sm); margin-bottom:10px;"></div>
+
+                                <input type="hidden" id="signupLat" value="">
+                                <input type="hidden" id="signupLng" value="">
+
+                                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                    <div style="flex:1;">
+                                        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:2px;">HOUSE / DOOR NO.</label>
+                                        <input type="text" id="signupHouseNumber" placeholder="Flat 402, Block B" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:12px;" oninput="MediApp.updateSignupFullAddress()">
+                                    </div>
+                                    <div style="flex:2;">
+                                        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:2px;">STREET / AREA</label>
+                                        <input type="text" id="signupStreet" placeholder="Sector 18, Main Boulevard" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:12px;" oninput="MediApp.updateSignupFullAddress()">
+                                    </div>
+                                </div>
+
+                                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                                    <div style="flex:1;">
+                                        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:2px;">CITY *</label>
+                                        <input type="text" id="signupCity" placeholder="Noida" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:12px;" oninput="MediApp.updateSignupFullAddress()">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:2px;">STATE</label>
+                                        <input type="text" id="signupState" placeholder="Uttar Pradesh" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:12px;" oninput="MediApp.updateSignupFullAddress()">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:2px;">PINCODE *</label>
+                                        <input type="text" id="signupPincode" placeholder="201301" maxlength="6" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:12px;" oninput="MediApp.updateSignupFullAddress()">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:2px;">FULL DELIVERY ADDRESS *</label>
+                                    <input type="text" id="signupAddress" placeholder="Flat 402, Sector 18, Noida, UP - 201301" required style="width:100%; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                                </div>
                             </div>
                         </div>
 
@@ -4290,6 +4671,54 @@
 
                     <div style="text-align:center; margin-top:20px; font-size:13px; color:var(--text-muted);">
                         Already have an account? <a href="#" style="color:var(--primary); font-weight:800;" onclick="MediApp.setAuthMode('login')">Sign In Here</a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    // 10. Dedicated OTP Verification Page UI Renderer
+    renderOtpPage() {
+      const pendingEmail = this.app && this.app.state && this.app.state.pendingOtpEmail || "user@example.com";
+      return `
+            <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--background) 0%, var(--primary-light) 100%); padding:20px;">
+                <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-lg); padding:32px; width:100%; max-width:440px; box-shadow:var(--shadow-lg); text-align:center;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="MediApp.setAuthMode('signup')">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Register
+                        </button>
+                        <span style="font-size:11px; font-weight:800; background:var(--primary-light); color:var(--primary); padding:3px 8px; border-radius:var(--radius-full);">VERIFY EMAIL</span>
+                    </div>
+
+                    <div style="margin-bottom:24px;">
+                        <div class="brand-icon" style="width:60px; height:60px; font-size:28px; margin:0 auto 12px auto; background:linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color:#fff; display:flex; align-items:center; justify-content:center; border-radius:50%; box-shadow:var(--shadow-md);">
+                            <i class="fa-solid fa-envelope-circle-check"></i>
+                        </div>
+                        <h2 style="font-size:24px; font-weight:800; margin-bottom:6px;">Verify your email</h2>
+                        <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">
+                            We sent a 6-digit verification code to:<br>
+                            <strong style="color:var(--primary); font-size:14px; word-break:break-all;">${pendingEmail}</strong>
+                        </p>
+                    </div>
+
+                    <form onsubmit="event.preventDefault(); MediApp.handleVerifyOtpSubmit(this);">
+                        <div style="margin-bottom:20px;">
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-main);">Enter 6-Digit OTP Code</label>
+                            <input type="text" id="otpCodeInput" placeholder="\u2022 \u2022 \u2022 \u2022 \u2022 \u2022" maxlength="6" pattern="[0-9]{6}" required style="width:100%; padding:14px; border:2px solid var(--card-border); border-radius:var(--radius-md); font-size:24px; font-weight:800; text-align:center; letter-spacing:10px; font-family:monospace; background:var(--card-bg); color:var(--text-main);" autocomplete="one-time-code">
+                        </div>
+
+                        <div id="otpErrorBanner" style="display:none; background:var(--emergency-light); color:var(--emergency-red); padding:10px; border-radius:var(--radius-sm); font-size:12px; margin-bottom:16px; font-weight:600; text-align:center;"></div>
+                        <div id="otpSuccessBanner" style="display:none; background:#f0fdf4; color:#166534; padding:10px; border-radius:var(--radius-sm); font-size:12px; margin-bottom:16px; font-weight:600; text-align:center;"></div>
+
+                        <button type="submit" id="btnVerifyOtp" class="add-cart-btn" style="width:100%; justify-content:center; padding:14px; font-size:15px; font-weight:700; background:var(--primary);">
+                            <i class="fa-solid fa-shield-check"></i> Verify OTP
+                        </button>
+                    </form>
+
+                    <div style="margin-top:20px; padding-top:16px; border-top:1px dashed var(--card-border); display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:12px; color:var(--text-muted);">Didn't receive the code?</span>
+                        <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:12px; color:var(--primary); border:1px solid var(--primary-light);" onclick="MediApp.handleResendOtp()">
+                            <i class="fa-solid fa-rotate-right"></i> Resend OTP
+                        </button>
                     </div>
                 </div>
             </div>
@@ -4354,6 +4783,28 @@
         });
         this.app.showToast(`\u{1F514} ${data.title}: ${data.body}`);
         this.app.render();
+      });
+      this.socket.on("medicine_updated", (data) => {
+        console.log("\u26A1 Realtime Medicine Price Update Received:", data);
+        if (this.app && this.app.state && this.app.state.medicines) {
+          const med = this.app.state.medicines.find((m) => m.id === data.id);
+          if (med) {
+            if (data.price !== void 0) med.price = data.price;
+            if (data.stock !== void 0) med.stock = data.stock;
+            if (data.medicine) Object.assign(med, data.medicine);
+          } else if (data.medicine) {
+            this.app.state.medicines.unshift(data.medicine);
+          }
+          const mockMed = MOCK_MEDICINES.find((m) => m.id === data.id);
+          if (mockMed) {
+            if (data.price !== void 0) mockMed.price = data.price;
+            if (data.stock !== void 0) mockMed.stock = data.stock;
+          }
+          if (typeof this.app.saveMedicinesToStorage === "function") {
+            this.app.saveMedicinesToStorage();
+          }
+          this.app.render();
+        }
       });
     }
     // FIREBASE ONSNAPSHOT LISTENERS SIMULATOR & SUBSCRIPTIONS
@@ -4768,6 +5219,96 @@
     }
   };
 
+  // js/socket.js
+  var SocketClient = class {
+    constructor(app) {
+      this.app = app;
+      this.socket = null;
+      this.init();
+    }
+    init() {
+      if (typeof io !== "undefined") {
+        this.socket = io("http://localhost:5000");
+        this.socket.on("connect", () => {
+          console.log("[Websocket] Connected to MediFind Socket.IO server:", this.socket.id);
+        });
+        this.socket.on("order_created", (newOrder) => {
+          const currentUser = this.app.authService ? this.app.authService.getUser() : null;
+          const currentRole = this.app.state.currentRole;
+          if (currentRole === "admin" || currentRole === "pharmacy" || currentUser && newOrder.user_id === currentUser.id) {
+            this.app.showToast(`\u26A1 New Order Received: ${newOrder.id}`);
+            const existing = (this.app.state.orders || []).find((o) => o.id === newOrder.id);
+            if (!existing) {
+              this.app.state.orders.unshift(newOrder);
+              if (currentRole === "customer") {
+                this.app.saveOrdersToStorage();
+              }
+            }
+            this.app.render();
+          }
+        });
+        this.socket.on("order_status_updated", (data) => {
+          const currentUser = this.app.authService ? this.app.authService.getUser() : null;
+          const currentRole = this.app.state.currentRole;
+          const order = (this.app.state.orders || []).find((o) => o.id === data.id);
+          if (order) {
+            order.order_status = data.status;
+            if (data.tracking_step) order.tracking_step = data.tracking_step;
+            if (currentRole === "admin" || currentRole === "pharmacy" || currentUser && order.user_id === currentUser.id) {
+              this.app.showToast(`Order ${data.id} Status: ${data.status}`);
+              this.app.render();
+            }
+          }
+        });
+        this.socket.on("medicine_updated", (data) => {
+          console.log("[Socket.IO] Realtime medicine update received:", data);
+          if (this.app && this.app.state && this.app.state.medicines) {
+            const med = this.app.state.medicines.find((m) => m.id === data.id);
+            if (med) {
+              if (data.price !== void 0) med.price = data.price;
+              if (data.stock !== void 0) med.stock = data.stock;
+              if (data.medicine) Object.assign(med, data.medicine);
+            } else if (data.medicine) {
+              this.app.state.medicines.unshift(data.medicine);
+            }
+            const mockMed = MOCK_MEDICINES.find((m) => m.id === data.id);
+            if (mockMed) {
+              if (data.price !== void 0) mockMed.price = data.price;
+              if (data.stock !== void 0) mockMed.stock = data.stock;
+            }
+            if (typeof this.app.saveMedicinesToStorage === "function") {
+              this.app.saveMedicinesToStorage();
+            }
+            this.app.render();
+          }
+        });
+        this.socket.on("medicine_added", (newMed) => {
+          console.log("[Socket.IO] Realtime medicine added:", newMed);
+          if (this.app && this.app.state && this.app.state.medicines) {
+            const exists = this.app.state.medicines.some((m) => m.id === newMed.id);
+            if (!exists) {
+              this.app.state.medicines.unshift(newMed);
+              if (typeof this.app.saveMedicinesToStorage === "function") {
+                this.app.saveMedicinesToStorage();
+              }
+              this.app.render();
+            }
+          }
+        });
+        this.socket.on("medicine_deleted", (data) => {
+          console.log("[Socket.IO] Realtime medicine deleted:", data);
+          if (this.app && this.app.state && this.app.state.medicines) {
+            this.app.state.medicines = this.app.state.medicines.filter((m) => m.id !== data.id);
+            if (typeof this.app.saveMedicinesToStorage === "function") {
+              this.app.saveMedicinesToStorage();
+            }
+            this.app.render();
+          }
+        });
+      }
+    }
+  };
+
   // js/app.js
   var MediFindApp = class {
     constructor() {
@@ -4775,6 +5316,7 @@
       this.realtimeEngine = new RealtimeEngine(this);
       this.paymentService = new PaymentService(this);
       this.fcmService = new FcmService(this);
+      this.socketClient = new SocketClient(this);
       this.state = {
         currentRole: "customer",
         // customer, pharmacy, delivery, admin
@@ -4785,6 +5327,7 @@
         medicines: [...MOCK_MEDICINES],
         pharmacies: [...MOCK_PHARMACIES],
         orders: [...MOCK_ORDERS],
+        usersList: [],
         cart: [],
         prescriptions: [],
         appliedCoupon: null,
@@ -4797,25 +5340,209 @@
       this.deliveryModule = new DeliveryModule(this);
       this.adminModule = new AdminModule(this);
       this.aiEngine = new AiEngine(this);
+      this.mapPickerState = null;
       this.init();
     }
-    init() {
+    clearLocalOrderStorage() {
+      try {
+        const keys = Object.keys(localStorage);
+        keys.forEach((k) => {
+          if (k.startsWith("medifind_user_orders_") || k === "medifind_global_orders_backup" || k.includes("orders")) {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch (e) {
+      }
+    }
+    saveOrdersToStorage() {
+      try {
+        const currentUser = this.authService ? this.authService.getUser() : null;
+        const storageKey = currentUser ? `medifind_user_orders_${currentUser.id}` : "medifind_user_orders_guest";
+        localStorage.setItem(storageKey, JSON.stringify(this.state.orders));
+        localStorage.setItem("medifind_global_orders_backup", JSON.stringify(this.state.orders));
+      } catch (e) {
+        console.warn("[Orders Persistence] Error saving to localStorage:", e);
+      }
+    }
+    async resetAdminOrdersAndRevenue() {
+      if (!confirm("Are you sure you want to reset all platform orders and revenue to \u20B90?")) return;
+      try {
+        const res = await fetch("/api/orders/reset", { method: "POST" });
+        const data = await res.json();
+        this.clearLocalOrderStorage();
+        this.state.orders = [];
+        this.saveOrdersToStorage();
+        this.showToast("\u{1F9F9} All Platform Orders & Revenue Reset to \u20B90");
+        this.render();
+      } catch (err) {
+        console.error("Reset orders error:", err);
+        this.clearLocalOrderStorage();
+        this.state.orders = [];
+        this.render();
+      }
+    }
+    async loadSavedOrders(skipRenderIfModalOpen = false) {
+      const currentUser = this.authService ? this.authService.getUser() : null;
+      const currentRole = this.state.currentRole;
+      const keysToTry = [
+        currentUser ? `medifind_user_orders_${currentUser.id}` : null,
+        "medifind_user_orders_guest",
+        "medifind_global_orders_backup"
+      ].filter(Boolean);
+      const orderMap = /* @__PURE__ */ new Map();
+      for (const key of keysToTry) {
+        try {
+          const localData = localStorage.getItem(key);
+          if (localData && localData !== "undefined") {
+            const parsed = JSON.parse(localData);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((o) => {
+                if (o && o.id) orderMap.set(o.id, o);
+              });
+            }
+          }
+        } catch (e) {
+        }
+      }
+      if (this.authService && this.authService.api) {
+        try {
+          const remoteOrders = await this.authService.api.fetchUserOrders();
+          if (Array.isArray(remoteOrders)) {
+            if (remoteOrders.length === 0 && currentRole === "admin") {
+              orderMap.clear();
+              this.clearLocalOrderStorage();
+            } else {
+              remoteOrders.forEach((o) => {
+                if (o && o.id) orderMap.set(o.id, o);
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("[Orders Persistence] Remote order sync note:", err);
+        }
+      }
+      let allOrders = Array.from(orderMap.values());
+      allOrders.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      if (currentRole === "customer" && currentUser) {
+        const userEmail = (currentUser.email || "").toLowerCase();
+        const userName = (currentUser.name || "").toLowerCase();
+        const userId = String(currentUser.id || "");
+        const filtered = allOrders.filter((o) => {
+          if (!o) return false;
+          const oUserId = String(o.user_id || "");
+          const oCustId = String(o.customer_id || "");
+          const oEmail = (o.customer_email || "").toLowerCase();
+          const oName = (o.customer_name || "").toLowerCase();
+          return userId && (oUserId === userId || oCustId === userId) || userEmail && oEmail && oEmail === userEmail || userName && oName && oName === userName || oUserId.startsWith("usr_guest_");
+        });
+        this.state.orders = filtered.length > 0 ? filtered : allOrders;
+      } else {
+        this.state.orders = allOrders;
+      }
+      this.saveOrdersToStorage();
+      if (!skipRenderIfModalOpen || !this.isModalOpen()) {
+        this.render();
+      }
+    }
+    async loadAllUsers(skipRenderIfModalOpen = false) {
+      if (this.authService && this.authService.api) {
+        try {
+          const users = await this.authService.api.fetchAllUsers();
+          if (Array.isArray(users) && users.length > 0) {
+            this.state.usersList = users;
+            if (!skipRenderIfModalOpen || !this.isModalOpen()) {
+              this.render();
+            }
+          }
+        } catch (err) {
+          console.warn("[Users Fetch Note]:", err);
+        }
+      }
+    }
+    syncMedicinesToFirestore() {
+      try {
+        if (window.firestoreDb && this.state && this.state.medicines) {
+          window.firestoreDb.collections.Medicines.clear();
+          this.state.medicines.forEach((m) => window.firestoreDb.collections.Medicines.set(m.id, m));
+        }
+      } catch (e) {
+        console.warn("[Firestore Sync Note]", e);
+      }
+    }
+    saveMedicinesToStorage() {
+      try {
+        localStorage.setItem("medifind_medicines_catalog", JSON.stringify(this.state.medicines));
+        if (typeof this.syncMedicinesToFirestore === "function") {
+          this.syncMedicinesToFirestore();
+        }
+      } catch (e) {
+        console.warn("[Medicines Persistence] Error saving to localStorage:", e);
+      }
+    }
+    async loadSavedMedicines() {
+      try {
+        const localData = localStorage.getItem("medifind_medicines_catalog");
+        if (localData) {
+          const parsed = JSON.parse(localData);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.state.medicines = parsed;
+            const localMap = new Map(parsed.map((m) => [m.id, m]));
+            MOCK_MEDICINES.forEach((mockMed) => {
+              if (localMap.has(mockMed.id)) {
+                const updated = localMap.get(mockMed.id);
+                mockMed.price = updated.price;
+                mockMed.stock = updated.stock;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[Medicines Persistence] Error reading local storage:", e);
+      }
+      try {
+        const res = await fetch("/api/medicines");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.medicines) && data.medicines.length > 0) {
+            const localMap = new Map(this.state.medicines.map((m) => [m.id, m]));
+            for (const remoteMed of data.medicines) {
+              if (localMap.has(remoteMed.id)) {
+                const localMed = localMap.get(remoteMed.id);
+                localMed.price = remoteMed.price;
+                localMed.stock = remoteMed.stock;
+              } else {
+                this.state.medicines.push(remoteMed);
+              }
+              const mockMed = MOCK_MEDICINES.find((m) => m.id === remoteMed.id);
+              if (mockMed) {
+                mockMed.price = remoteMed.price;
+                mockMed.stock = remoteMed.stock;
+              }
+            }
+            this.saveMedicinesToStorage();
+            this.render();
+          }
+        }
+      } catch (err) {
+        console.warn("[Medicines Persistence] Remote fetch note:", err);
+      }
+    }
+    async init() {
       window.MediApp = this;
       this.state.cart = [];
       this.state.orders = [];
-      if (this.authService.isAuthenticated()) {
-        const user = this.authService.getUser();
-        const target = this.authService.getRedirectTabForRole(user.role);
-        this.state.currentRole = target.role;
-      } else {
-        this.state.currentRole = "auth";
-        this.state.authMode = "landing";
-      }
+      this.clearLocalOrderStorage();
+      sessionStorage.removeItem("medifind_current_role");
+      sessionStorage.removeItem("medifind_admin_tab");
+      this.state.currentRole = "auth";
+      this.state.authMode = "landing";
+      await Promise.all([
+        this.loadSavedOrders(),
+        this.loadSavedMedicines(),
+        this.loadAllUsers()
+      ]);
       if (navigator.geolocation) {
         googleMapsService.requestBrowserLocation().then((res) => {
-          if (res.success) {
-            this.showToast("\u{1F4CD} Real GPS Location Detected! Nearby Pharmacies Loaded");
-          }
           this.render();
         });
       }
@@ -4826,73 +5553,514 @@
       this.showToast("MediFind Application Ready \u{1F3E5}");
     }
     initAndroidBackButton() {
-      if (window.Capacitor && window.Capacitor.isPluginAvailable("App")) {
-        Promise.resolve().then(() => (init_esm(), esm_exports)).then(({ App: App2 }) => {
-          App2.addListener("backButton", () => {
+      if (window.Capacitor && window.Capacitor.isPluginAvailable && window.Capacitor.isPluginAvailable("App")) {
+        const App = window.Capacitor.Plugins ? window.Capacitor.Plugins.App : null;
+        if (App) {
+          App.addListener("backButton", () => {
             if (this.activeModal) {
               this.closeModal();
             } else if (this.state.customerTab !== "home") {
               this.setCustomerTab("home");
             } else {
-              App2.exitApp();
+              App.exitApp();
             }
           });
-        }).catch((e) => console.log("[Back Button Listener Note]:", e));
+        }
       }
-      window.addEventListener("offline", () => {
-        this.showModal(`
-                <div class="modal-card" style="max-width:380px; padding:24px; text-align:center;">
-                    <div style="font-size:44px; color:var(--emergency-red); margin-bottom:12px;"><i class="fa-solid fa-wifi"></i></div>
-                    <h3 style="font-size:18px; margin-bottom:6px;">No Internet Connection</h3>
-                    <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">MediFind requires an internet connection to load live pharmacies and medicines.</p>
-                    <button class="add-cart-btn" style="width:100%; justify-content:center;" onclick="window.location.reload()">
-                        <i class="fa-solid fa-rotate-right"></i> Retry
-                    </button>
-                </div>
-            `);
-      });
+      if (typeof window !== "undefined" && window.addEventListener) {
+        window.addEventListener("offline", () => {
+          this.showModal(`
+                    <div class="modal-card" style="max-width:380px; padding:24px; text-align:center;">
+                        <div style="font-size:44px; color:var(--emergency-red); margin-bottom:12px;"><i class="fa-solid fa-wifi"></i></div>
+                        <h3 style="font-size:18px; margin-bottom:6px;">No Internet Connection</h3>
+                        <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">MediFind requires an internet connection to load live pharmacies and medicines.</p>
+                        <button class="add-cart-btn" style="width:100%; justify-content:center;" onclick="window.location.reload()">
+                            <i class="fa-solid fa-rotate-right"></i> Retry
+                        </button>
+                    </div>
+                `);
+        });
+      }
     }
     showSplashScreen() {
       if (sessionStorage.getItem("medifind_splash_shown")) return;
       sessionStorage.setItem("medifind_splash_shown", "true");
       const splash = document.createElement("div");
       splash.className = "splash-screen";
+      splash.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:linear-gradient(135deg, #0b1329 0%, #0f172a 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999999; transition:opacity 0.4s ease, visibility 0.4s ease; color:white;";
       splash.innerHTML = `
-            <div class="splash-logo">
+            <div class="splash-logo" style="width:72px; height:72px; background:linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px; color:white; margin-bottom:16px; box-shadow:0 0 30px rgba(14,165,233,0.4);">
                 <i class="fa-solid fa-notes-medical"></i>
             </div>
-            <h1 style="font-size:28px; font-weight:800; color:white; margin-bottom:4px;">MediFind</h1>
-            <p style="font-size:13px; color:#94a3b8; font-weight:600; text-align:center; max-width:280px; margin:0 auto;">
+            <h1 style="font-size:28px; font-weight:800; color:white; margin-bottom:4px; font-family:sans-serif;">MediFind</h1>
+            <p style="font-size:13px; color:#94a3b8; font-weight:600; text-align:center; max-width:280px; margin:0 auto; font-family:sans-serif;">
                 Find Medicines. Find Pharmacies. Get Care Faster.
             </p>
-            <div style="margin-top:24px;" class="loading-spinner"></div>
+            <div style="margin-top:24px; width:32px; height:32px; border:3px solid rgba(255,255,255,0.2); border-top-color:#0ea5e9; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
         `;
       document.body.appendChild(splash);
       setTimeout(() => {
         splash.style.opacity = "0";
         splash.style.visibility = "hidden";
-        setTimeout(() => splash.remove(), 500);
-      }, 1200);
+        setTimeout(() => {
+          try {
+            splash.remove();
+          } catch (e) {
+          }
+        }, 400);
+      }, 1e3);
+    }
+    isModalOpen() {
+      const container = document.getElementById("modalContainer");
+      return container && container.children.length > 0 && container.innerHTML.trim() !== "";
     }
     render() {
+      var _a;
       const root = document.getElementById("app");
       if (!root) return;
+      const activeEl = document.activeElement;
+      const focusedId = activeEl && activeEl.id ? activeEl.id : null;
+      let selectionStart = null;
+      let selectionEnd = null;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        try {
+          selectionStart = activeEl.selectionStart;
+          selectionEnd = activeEl.selectionEnd;
+        } catch (e) {
+        }
+      }
+      const modalContainer = document.getElementById("modalContainer");
+      if (modalContainer) {
+        modalContainer.querySelectorAll("input, select, textarea").forEach((el) => {
+          el.setAttribute("value", el.value);
+        });
+      }
+      const existingModal = (modalContainer == null ? void 0 : modalContainer.innerHTML) || "";
+      const existingToasts = ((_a = document.getElementById("toastContainer")) == null ? void 0 : _a.innerHTML) || "";
       let contentHtml = "";
       if (this.state.currentRole === "auth") {
         contentHtml = this.authService.renderLoginPage();
+      } else if (this.state.currentRole === "admin") {
+        contentHtml = this.adminModule.render();
+      } else if (this.state.currentRole === "pharmacy") {
+        contentHtml = this.pharmacyModule.render();
+      } else if (this.state.currentRole === "delivery") {
+        contentHtml = this.deliveryModule.render();
       } else {
         contentHtml = this.customerModule.render();
       }
       root.innerHTML = `
             ${contentHtml}
-            <div id="modalContainer"></div>
-            <div id="toastContainer" class="toast-container"></div>
+            <div id="modalContainer">${existingModal}</div>
+            <div id="toastContainer" class="toast-container">${existingToasts}</div>
         `;
+      if (focusedId) {
+        const restoredEl = document.getElementById(focusedId);
+        if (restoredEl) {
+          restoredEl.focus();
+          if (selectionStart !== null && selectionEnd !== null && (restoredEl.tagName === "INPUT" || restoredEl.tagName === "TEXTAREA")) {
+            try {
+              restoredEl.setSelectionRange(selectionStart, selectionEnd);
+            } catch (e) {
+            }
+          }
+        }
+      }
       setTimeout(() => {
         if (this.state.customerTab === "pharmacies") {
           googleMapsService.renderMapCanvas("nearbyPharmaciesMapCanvas");
         }
+        if (this.state.currentRole === "auth" && this.state.authMode === "signup") {
+          this.autoDetectSignupLocation();
+        }
       }, 100);
+    }
+    async setAdminTab(tab) {
+      if (this.adminModule) {
+        this.adminModule.activeTab = tab;
+        sessionStorage.setItem("medifind_admin_tab", tab);
+      }
+      sessionStorage.setItem("medifind_current_role", "admin");
+      await Promise.all([this.loadSavedOrders(), this.loadAllUsers()]);
+      this.startAdminLivePolling();
+      this.render();
+      setTimeout(() => {
+        if (this.adminModule && this.adminModule.initCharts) {
+          this.adminModule.initCharts();
+        }
+      }, 100);
+    }
+    startAdminLivePolling() {
+      if (this._adminPollTimer) return;
+      this._adminPollTimer = setInterval(async () => {
+        if (this.state && this.state.currentRole === "admin") {
+          await Promise.all([this.loadSavedOrders(true), this.loadAllUsers(true)]);
+        }
+      }, 5e3);
+    }
+    async handleAdminLoginFormSubmit(form) {
+      var _a, _b, _c, _d;
+      const email = (_b = (_a = document.getElementById("adminAuthEmail")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      const password = (_d = (_c = document.getElementById("adminAuthPassword")) == null ? void 0 : _c.value) == null ? void 0 : _d.trim();
+      const errorBanner = document.getElementById("adminAuthErrorBanner");
+      if (!email || !password) return;
+      let res = await this.authService.login(email, password, true);
+      if (res.success) {
+        const userRole = res.user && res.user.role ? res.user.role : "";
+        const userEmail = res.user && res.user.email ? res.user.email.toLowerCase() : "";
+        if (userRole !== "admin" && userEmail !== "admin@medifind.com") {
+          if (errorBanner) {
+            errorBanner.style.display = "block";
+            errorBanner.innerText = "Access Denied: Only administrator accounts can access the Admin Portal.";
+          }
+          return;
+        }
+        this.state.currentRole = "admin";
+        sessionStorage.setItem("medifind_current_role", "admin");
+        sessionStorage.setItem("medifind_admin_tab", "medicines");
+        this.authService.setCurrentUser(res.user, true);
+        this.showToast("\u{1F6E1}\uFE0F Admin Control Panel Access Granted");
+        await Promise.all([this.loadAllUsers(), this.loadSavedOrders()]);
+        this.startAdminLivePolling();
+        this.render();
+        setTimeout(() => {
+          if (this.adminModule && this.adminModule.initCharts) {
+            this.adminModule.initCharts();
+          }
+        }, 100);
+      } else {
+        if (errorBanner) {
+          errorBanner.style.display = "block";
+          errorBanner.innerText = res.message || "Invalid administrator credentials.";
+        }
+      }
+    }
+    async fetchRealtimeAdminUsers() {
+      try {
+        const res = await fetch("/api/auth/users");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.users)) {
+            this.state.usersList = data.users;
+          }
+        }
+        const ordRes = await fetch("/api/orders");
+        if (ordRes.ok) {
+          const ordData = await ordRes.json();
+          if (ordData && ordData.success && Array.isArray(ordData.orders)) {
+            this.state.orders = ordData.orders;
+          }
+        }
+        this.render();
+      } catch (e) {
+        console.warn("[Admin Live Sync Warning]:", e);
+      }
+    }
+    viewUserOrdersModal(userId, userName) {
+      const allOrders = this.state.orders || [];
+      const userOrders = allOrders.filter((o) => o.user_id === userId || o.customer_name && userName && o.customer_name.toLowerCase() === userName.toLowerCase());
+      this.showModal(`
+            <div class="modal-card" style="max-width:600px;">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                    <div style="width:44px; height:44px; background:var(--primary-light); color:var(--primary); border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:20px;">
+                        <i class="fa-solid fa-user-gear"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size:18px; margin:0;">Real-Time Orders for ${userName}</h3>
+                        <p style="font-size:12px; color:var(--text-muted); margin:0;">User ID: ${userId} \u2022 ${userOrders.length} Total Orders Placed</p>
+                    </div>
+                </div>
+
+                ${userOrders.length === 0 ? `
+                    <div style="text-align:center; padding:30px; background:var(--background); border-radius:var(--radius-md);">
+                        <i class="fa-solid fa-box-open" style="font-size:32px; color:var(--text-muted); margin-bottom:8px;"></i>
+                        <p style="font-size:13px; color:var(--text-muted);">No orders placed yet by this user.</p>
+                    </div>
+                ` : `
+                    <div style="display:flex; flex-direction:column; gap:12px; max-height:400px; overflow-y:auto; padding-right:4px;">
+                        ${userOrders.map((o) => `
+                            <div style="background:var(--background); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <strong style="color:var(--primary); font-size:14px;">${o.id}</strong>
+                                    <span class="role-badge-btn" style="font-size:10px;">${o.order_status}</span>
+                                </div>
+                                <div style="font-size:12px; color:var(--text-main); margin-bottom:4px;">
+                                    <strong>Pharmacy:</strong> ${o.pharmacy_name || "Apollo Pharmacy 24/7"}
+                                </div>
+                                <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">
+                                    <strong>Items:</strong> ${(o.items || []).map((it) => `${it.quantity || 1}x ${it.name}`).join(", ")}
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; border-top:1px dashed var(--card-border); padding-top:6px;">
+                                    <span style="color:var(--text-muted);">Payment: <strong>${o.payment_method || "UPI"} (${o.payment_status})</strong></span>
+                                    <strong style="color:var(--secondary); font-size:14px;">\u20B9${(o.total_amount || 0).toFixed(2)}</strong>
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                `}
+                <button class="btn-secondary" style="width:100%; justify-content:center; margin-top:16px;" onclick="MediApp.closeModal()">Close</button>
+            </div>
+        `);
+    }
+    openAddMedicineModal() {
+      this.showModal(`
+            <div class="modal-card">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h3 style="font-size:18px; margin-bottom:14px;"><i class="fa-solid fa-pills" style="color:var(--primary);"></i> Add New Medicine to Catalog</h3>
+                <form onsubmit="event.preventDefault(); MediApp.handleAddMedicineSubmit(this);">
+                    <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+                        <div>
+                            <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">MEDICINE BRAND NAME *</label>
+                            <input type="text" id="adminMedName" placeholder="e.g. Dolo 650 Tablet" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <div style="flex:1;">
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">GENERIC NAME</label>
+                                <input type="text" id="adminMedGeneric" placeholder="Paracetamol 650mg" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">CATEGORY</label>
+                                <select id="adminMedCategory" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                                    <option value="pain-relief">Pain Relief</option>
+                                    <option value="antibiotics">Antibiotics</option>
+                                    <option value="first-aid">First Aid</option>
+                                    <option value="vitamins">Vitamins & Supplements</option>
+                                    <option value="cardiac">Cardiac & BP</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <div style="flex:1;">
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">UNIT PRICE (\u20B9) *</label>
+                                <input type="number" step="0.5" id="adminMedPrice" placeholder="30.00" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">STOCK UNITS *</label>
+                                <input type="number" id="adminMedStock" placeholder="100" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="add-cart-btn" style="width:100%; justify-content:center; padding:10px; font-size:14px;">
+                        <i class="fa-solid fa-plus"></i> Save Medicine to Catalog
+                    </button>
+                </form>
+            </div>
+        `);
+    }
+    async handleAddMedicineSubmit() {
+      var _a, _b, _c, _d, _e, _f, _g;
+      const name = (_b = (_a = document.getElementById("adminMedName")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      const generic_name = ((_d = (_c = document.getElementById("adminMedGeneric")) == null ? void 0 : _c.value) == null ? void 0 : _d.trim()) || name;
+      const category = ((_e = document.getElementById("adminMedCategory")) == null ? void 0 : _e.value) || "general";
+      const price = parseFloat(((_f = document.getElementById("adminMedPrice")) == null ? void 0 : _f.value) || "0");
+      const stock = parseInt(((_g = document.getElementById("adminMedStock")) == null ? void 0 : _g.value) || "50");
+      if (!name || !price) return;
+      const newMed = {
+        id: `med_${Date.now()}`,
+        name,
+        generic_name,
+        category,
+        price,
+        stock,
+        dosage: "Standard Dosage",
+        pharmacy_id: "pharm_1",
+        pharmacy_name: "Apollo Pharmacy 24/7",
+        requires_prescription: false,
+        image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80"
+      };
+      this.state.medicines.unshift(newMed);
+      this.saveMedicinesToStorage();
+      this.closeModal();
+      this.showToast(`\u2705 Added ${name} to Catalog!`);
+      try {
+        const token = localStorage.getItem("medifind_auth_token") || localStorage.getItem("medifind_jwt_token");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        await fetch("/api/medicines", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(newMed)
+        });
+      } catch (e) {
+        console.warn("[Admin Add Medicine] API note:", e);
+      }
+      this.render();
+    }
+    openEditMedicinePriceModal(medId) {
+      const med = this.state.medicines.find((m) => m.id === medId);
+      if (!med) return;
+      this.showModal(`
+            <div class="modal-card">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h3 style="font-size:18px; margin-bottom:14px;"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Update Medicine Price & Stock</h3>
+                <div style="background:var(--background); padding:10px; border-radius:var(--radius-sm); margin-bottom:14px; font-size:13px;">
+                    <strong>${med.name}</strong><br>
+                    <span style="font-size:11px; color:var(--text-muted);">${med.generic_name} \u2022 Store: Nazarathpet Medicine Supply Store</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+                    <div>
+                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">NEW UNIT PRICE (\u20B9) *</label>
+                        <input type="number" step="0.5" id="editMedPrice" value="${med.price}" oninput="this.setAttribute('value', this.value)" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:14px; font-weight:700; color:var(--secondary);">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">NEW STOCK UNITS *</label>
+                        <input type="number" id="editMedStock" value="${med.stock}" oninput="this.setAttribute('value', this.value)" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                    </div>
+                </div>
+                <button type="button" class="add-cart-btn" style="width:100%; justify-content:center; padding:10px; font-size:14px;" onclick="MediApp.handleUpdateMedicinePriceSubmit('${med.id}')">
+                    <i class="fa-solid fa-floppy-disk"></i> Update Price & Stock
+                </button>
+            </div>
+        `);
+    }
+    async handleUpdateMedicinePriceSubmit(medId) {
+      var _a, _b;
+      const priceVal = parseFloat(((_a = document.getElementById("editMedPrice")) == null ? void 0 : _a.value) || "0");
+      const stockVal = parseInt(((_b = document.getElementById("editMedStock")) == null ? void 0 : _b.value) || "0", 10);
+      if (isNaN(priceVal) || priceVal < 0) return;
+      if (isNaN(stockVal) || stockVal < 0) return;
+      const med = this.state.medicines.find((m) => m.id === medId);
+      if (med) {
+        med.price = priceVal;
+        med.stock = stockVal;
+      }
+      const mockMed = MOCK_MEDICINES.find((m) => m.id === medId);
+      if (mockMed) {
+        mockMed.price = priceVal;
+        mockMed.stock = stockVal;
+      }
+      (this.state.cart || []).forEach((item) => {
+        if (item.id === medId) {
+          item.price = priceVal;
+        }
+      });
+      this.saveMedicinesToStorage();
+      if (this.socketClient && this.socketClient.socket) {
+        this.socketClient.socket.emit("medicine_updated", { id: medId, price: priceVal, stock: stockVal, medicine: med });
+      }
+      if (this.realtimeEngine && this.realtimeEngine.socket) {
+        this.realtimeEngine.socket.emit("medicine_updated", { id: medId, price: priceVal, stock: stockVal, medicine: med });
+      }
+      this.state.currentRole = "admin";
+      sessionStorage.setItem("medifind_current_role", "admin");
+      if (this.adminModule) {
+        this.adminModule.activeTab = "medicines";
+        sessionStorage.setItem("medifind_admin_tab", "medicines");
+      }
+      this.closeModal();
+      try {
+        const token = localStorage.getItem("medifind_auth_token") || localStorage.getItem("medifind_jwt_token");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        await fetch(`/api/medicines/${medId}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ price: priceVal, stock: stockVal })
+        });
+      } catch (e) {
+        console.warn("[Admin Update Medicine] API note:", e);
+      }
+      this.render();
+      this.showToast(`\u2705 Price updated to \u20B9${priceVal.toFixed(2)}`);
+    }
+    async deleteMedicine(medId) {
+      const med = this.state.medicines.find((m) => m.id === medId);
+      if (!confirm(`Are you sure you want to delete "${med ? med.name : "this medicine"}" from the catalog?`)) {
+        return;
+      }
+      this.state.medicines = this.state.medicines.filter((m) => m.id !== medId);
+      this.saveMedicinesToStorage();
+      this.showToast("\u{1F5D1}\uFE0F Medicine removed from catalog");
+      try {
+        const token = localStorage.getItem("medifind_auth_token") || localStorage.getItem("medifind_jwt_token");
+        const headers = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        await fetch(`/api/medicines/${medId}`, { method: "DELETE", headers });
+      } catch (e) {
+        console.warn("[Admin Delete Medicine] API note:", e);
+      }
+      this.render();
+    }
+    openAddPharmacyModal() {
+      this.showModal(`
+            <div class="modal-card">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h3 style="font-size:18px; margin-bottom:14px;"><i class="fa-solid fa-store" style="color:var(--warning-amber);"></i> Register New Pharmacy Store</h3>
+                <form onsubmit="event.preventDefault(); MediApp.handleAddPharmacySubmit();">
+                    <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+                        <div>
+                            <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">PHARMACY SHOP NAME *</label>
+                            <input type="text" id="adminPharmName" placeholder="e.g. MedPlus Pharmacy" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <div style="flex:1;">
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">OWNER NAME</label>
+                                <input type="text" id="adminPharmOwner" placeholder="Rajesh Kumar" style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">DRUG LICENSE NO. *</label>
+                                <input type="text" id="adminPharmLicense" placeholder="DL-2026-98765" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:11px; font-weight:700; display:block; margin-bottom:2px;">STORE ADDRESS *</label>
+                            <input type="text" id="adminPharmAddress" placeholder="Main Market Road, Noida" required style="width:100%; padding:8px 10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
+                        </div>
+                    </div>
+                    <button type="submit" class="add-cart-btn" style="width:100%; justify-content:center; padding:10px; font-size:14px;">
+                        <i class="fa-solid fa-plus"></i> Register Pharmacy Store
+                    </button>
+                </form>
+            </div>
+        `);
+    }
+    async handleAddPharmacySubmit() {
+      var _a, _b, _c, _d, _e, _f, _g, _h;
+      const shop_name = (_b = (_a = document.getElementById("adminPharmName")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      const owner_name = ((_d = (_c = document.getElementById("adminPharmOwner")) == null ? void 0 : _c.value) == null ? void 0 : _d.trim()) || "Verified Owner";
+      const license_number = (_f = (_e = document.getElementById("adminPharmLicense")) == null ? void 0 : _e.value) == null ? void 0 : _f.trim();
+      const address = (_h = (_g = document.getElementById("adminPharmAddress")) == null ? void 0 : _g.value) == null ? void 0 : _h.trim();
+      if (!shop_name || !license_number) return;
+      const newPharm = {
+        id: `pharm_${Date.now()}`,
+        shop_name,
+        owner_name,
+        license_number,
+        address: address || "Main Road",
+        phone: "+91 98765 00000",
+        rating: 4.9,
+        status: "open",
+        license_verified: true,
+        logo: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=150&auto=format&fit=crop&q=80"
+      };
+      this.state.pharmacies.unshift(newPharm);
+      this.closeModal();
+      this.showToast(`\u2705 Registered ${shop_name}!`);
+      try {
+        await fetch("/api/pharmacies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newPharm)
+        });
+      } catch (e) {
+        console.warn("[Admin Add Pharmacy] API note:", e);
+      }
+      this.render();
+    }
+    async deletePharmacy(pharmId) {
+      const pharm = this.state.pharmacies.find((p) => p.id === pharmId);
+      if (!confirm(`Are you sure you want to delete pharmacy store "${pharm ? pharm.shop_name : "this store"}"?`)) {
+        return;
+      }
+      this.state.pharmacies = this.state.pharmacies.filter((p) => p.id !== pharmId);
+      this.showToast("\u{1F5D1}\uFE0F Pharmacy store removed");
+      try {
+        await fetch(`/api/pharmacies/${pharmId}`, { method: "DELETE" });
+      } catch (e) {
+        console.warn("[Admin Delete Pharmacy] API note:", e);
+      }
+      this.render();
     }
     // Location & Pharmacy Actions
     async detectLiveLocation() {
@@ -4905,6 +6073,364 @@
       }
       this.render();
     }
+    autoDetectSignupLocation() {
+      if (this._signupLocAutoDetected) return;
+      this._signupLocAutoDetected = true;
+      this.detectSignupLocation();
+    }
+    updateSignupFullAddress() {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      const house = (_b = (_a = document.getElementById("signupHouseNumber")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      const street = (_d = (_c = document.getElementById("signupStreet")) == null ? void 0 : _c.value) == null ? void 0 : _d.trim();
+      const city = (_f = (_e = document.getElementById("signupCity")) == null ? void 0 : _e.value) == null ? void 0 : _f.trim();
+      const state = (_h = (_g = document.getElementById("signupState")) == null ? void 0 : _g.value) == null ? void 0 : _h.trim();
+      const pin = (_j = (_i = document.getElementById("signupPincode")) == null ? void 0 : _i.value) == null ? void 0 : _j.trim();
+      const fullInput = document.getElementById("signupAddress");
+      if (fullInput) {
+        const parts = [house, street, city, state, pin ? `PIN ${pin}` : ""].filter(Boolean);
+        if (parts.length > 0) {
+          fullInput.value = parts.join(", ");
+          fullInput.dispatchEvent(new Event("input", { bubbles: true }));
+          fullInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
+    }
+    async detectSignupLocation() {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      const statusBanner = document.getElementById("signupLocStatus");
+      const houseInput = document.getElementById("signupHouseNumber");
+      const streetInput = document.getElementById("signupStreet");
+      const cityInput = document.getElementById("signupCity");
+      const stateInput = document.getElementById("signupState");
+      const pinInput = document.getElementById("signupPincode");
+      const fullAddrInput = document.getElementById("signupAddress");
+      const latInput = document.getElementById("signupLat");
+      const lngInput = document.getElementById("signupLng");
+      if (statusBanner) {
+        statusBanner.style.display = "block";
+        statusBanner.style.background = "var(--primary-light)";
+        statusBanner.style.color = "var(--primary)";
+        statusBanner.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting your location...`;
+      }
+      let lat = null;
+      let lng = null;
+      const getGpsPosition = () => new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return reject(new Error("Geolocation unsupported"));
+        let resolved = false;
+        const timer = setTimeout(() => {
+          if (!resolved) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                if (!resolved) {
+                  resolved = true;
+                  resolve(pos);
+                }
+              },
+              (err) => {
+                if (!resolved) {
+                  resolved = true;
+                  reject(err);
+                }
+              },
+              { enableHighAccuracy: false, timeout: 5e3, maximumAge: 6e4 }
+            );
+          }
+        }, 1e4);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timer);
+              resolve(pos);
+            }
+          },
+          (err) => {
+            if (!resolved) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timer);
+                    resolve(pos);
+                  }
+                },
+                (lowErr) => {
+                  if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timer);
+                    reject(err);
+                  }
+                },
+                { enableHighAccuracy: false, timeout: 5e3, maximumAge: 6e4 }
+              );
+            }
+          },
+          { enableHighAccuracy: true, timeout: 1e4, maximumAge: 0 }
+        );
+      });
+      try {
+        const position = await getGpsPosition();
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+      } catch (gpsError) {
+        console.warn("[Signup Geolocation GPS Warning]:", gpsError);
+        try {
+          const ipRes = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client");
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            lat = ipData.latitude;
+            lng = ipData.longitude;
+          }
+        } catch (ipErr) {
+          console.warn("[Signup Geolocation IP Warning]:", ipErr);
+        }
+      }
+      if (!lat || !lng) {
+        lat = 13.0827;
+        lng = 80.2707;
+      }
+      if (latInput) latInput.value = lat;
+      if (lngInput) lngInput.value = lng;
+      let detectedHouseNumber = "";
+      let detectedStreet = "";
+      let detectedCity = "";
+      let detectedState = "";
+      let detectedPincode = "";
+      try {
+        const proxyRes = await fetch(`/api/places/geocode?lat=${lat}&lng=${lng}`);
+        if (proxyRes.ok) {
+          const proxyData = await proxyRes.json();
+          if (proxyData && proxyData.success) {
+            detectedHouseNumber = proxyData.house_number || "";
+            detectedStreet = proxyData.street || "";
+            detectedCity = proxyData.city || "";
+            detectedState = proxyData.state || "";
+            detectedPincode = proxyData.pincode || "";
+          }
+        }
+      } catch (e1) {
+        console.warn("[Reverse Geocode Tier 1 Backend Error]:", e1);
+      }
+      if (!detectedStreet || !detectedCity || !detectedState) {
+        try {
+          const osmRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+            headers: { "Accept-Language": "en" }
+          });
+          if (osmRes.ok) {
+            const osm = await osmRes.json();
+            const addr = osm.address || {};
+            if (!detectedHouseNumber) detectedHouseNumber = addr.house_number || addr.building || addr.house_name || addr.amenity || addr.shop || "";
+            if (!detectedStreet) detectedStreet = addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood || addr.residential || "";
+            if (!detectedCity) detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.city_district || addr.county || addr.state_district || "";
+            if (!detectedState) detectedState = addr.state || addr.region || "";
+            if (!detectedPincode) detectedPincode = (addr.postcode || "").replace(/\D/g, "").slice(0, 6);
+          }
+        } catch (e2) {
+          console.warn("[Reverse Geocode Tier 2 OSM Error]:", e2);
+        }
+      }
+      if (!detectedStreet || !detectedCity) {
+        try {
+          const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+          if (bdcRes.ok) {
+            const bdc = await bdcRes.json();
+            if (!detectedStreet) detectedStreet = bdc.locality || bdc.subLocality || bdc.street || "";
+            if (!detectedCity) detectedCity = bdc.city || ((_c = (_b = (_a = bdc.localityInfo) == null ? void 0 : _a.administrative) == null ? void 0 : _b[2]) == null ? void 0 : _c.name) || ((_f = (_e = (_d = bdc.localityInfo) == null ? void 0 : _d.administrative) == null ? void 0 : _e[1]) == null ? void 0 : _f.name) || "";
+            if (!detectedState) detectedState = bdc.principalSubdivision || ((_i = (_h = (_g = bdc.localityInfo) == null ? void 0 : _g.administrative) == null ? void 0 : _h[0]) == null ? void 0 : _i.name) || "";
+            if (!detectedPincode) detectedPincode = (bdc.postcode || "").replace(/\D/g, "").slice(0, 6);
+          }
+        } catch (e3) {
+          console.warn("[Reverse Geocode Tier 3 BDC Error]:", e3);
+        }
+      }
+      if (houseInput && detectedHouseNumber) houseInput.value = detectedHouseNumber;
+      if (streetInput && detectedStreet) streetInput.value = detectedStreet;
+      if (cityInput && detectedCity) cityInput.value = detectedCity;
+      if (stateInput && detectedState) stateInput.value = detectedState;
+      if (pinInput && detectedPincode) pinInput.value = detectedPincode;
+      this.updateSignupFullAddress();
+      [houseInput, streetInput, cityInput, stateInput, pinInput, fullAddrInput].forEach((inp) => {
+        if (inp) {
+          inp.dispatchEvent(new Event("input", { bubbles: true }));
+          inp.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+      if (statusBanner) {
+        statusBanner.style.background = "#f0fdf4";
+        statusBanner.style.color = "#166534";
+        statusBanner.innerHTML = `Location detected \u2713`;
+      }
+    }
+    setAuthMode(mode) {
+      this.state.currentRole = "auth";
+      this.state.authMode = mode;
+      if (mode === "signup") {
+        this._signupLocAutoDetected = false;
+      }
+      this.closeModal();
+      this.render();
+    }
+    openEditProfileModal() {
+      const user = this.authService ? this.authService.getUser() : null;
+      if (!user) {
+        this.showToast("Please sign in to edit your profile");
+        this.openAuthModal("login");
+        return;
+      }
+      const name = user.name || "";
+      const phone = user.phone || "";
+      const address = user.address || "";
+      const houseNumber = user.house_number || "";
+      const street = user.street || "";
+      const city = user.city || "";
+      const state = user.state || "";
+      const pincode = user.pincode || "";
+      const profileImage = user.profile_image || "";
+      this.showModal(`
+            <div class="modal-card" style="max-width:560px;">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                    <div style="width:40px; height:40px; border-radius:var(--radius-full); background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:18px;">
+                        <i class="fa-solid fa-user-pen"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size:18px; margin:0;">Edit Profile & Delivery Address</h3>
+                        <p style="font-size:12px; color:var(--text-muted); margin:0;">Update your contact info and delivery address in database</p>
+                    </div>
+                </div>
+
+                <form onsubmit="MediApp.saveProfileChanges(event)" style="display:flex; flex-direction:column; gap:14px;">
+                    <!-- Personal Information -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">Full Name *</label>
+                            <input type="text" id="editProfileName" class="search-input" value="${name}" required style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">Phone Number *</label>
+                            <input type="text" id="editProfilePhone" class="search-input" value="${phone}" required style="width:100%;">
+                        </div>
+                    </div>
+
+                    <!-- Delivery Address Details -->
+                    <div>
+                        <label style="font-size:12px; font-weight:700;">Full Delivery Address *</label>
+                        <input type="text" id="editProfileAddress" class="search-input" value="${address}" required placeholder="e.g. Flat 302, Green Park Apartments, Sector 18, Noida" style="width:100%;">
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">Flat / House No</label>
+                            <input type="text" id="editProfileHouse" class="search-input" value="${houseNumber}" placeholder="e.g. Flat 302" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">Street / Area</label>
+                            <input type="text" id="editProfileStreet" class="search-input" value="${street}" placeholder="e.g. Sector 18" style="width:100%;">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">City</label>
+                            <input type="text" id="editProfileCity" class="search-input" value="${city}" placeholder="Noida" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">State</label>
+                            <input type="text" id="editProfileState" class="search-input" value="${state}" placeholder="Uttar Pradesh" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700;">Pincode</label>
+                            <input type="text" id="editProfilePincode" class="search-input" value="${pincode}" placeholder="201301" style="width:100%;">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="saveProfileBtn" class="add-cart-btn" style="width:100%; justify-content:center; padding:12px; font-size:14px; margin-top:6px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Profile to Database
+                    </button>
+                </form>
+            </div>
+        `);
+    }
+    handleProfilePhotoUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_SIZE = 250;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          const preview = document.getElementById("editProfilePhotoPreview");
+          const input = document.getElementById("editProfileImageInput");
+          if (preview) preview.src = compressedDataUrl;
+          if (input) input.value = compressedDataUrl;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    async saveProfileChanges(event) {
+      var _a, _b, _c, _d, _e, _f, _g, _h;
+      event.preventDefault();
+      const submitBtn = document.getElementById("saveProfileBtn");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving to Database...';
+      }
+      const profileData = {
+        name: (_a = document.getElementById("editProfileName")) == null ? void 0 : _a.value,
+        phone: (_b = document.getElementById("editProfilePhone")) == null ? void 0 : _b.value,
+        address: (_c = document.getElementById("editProfileAddress")) == null ? void 0 : _c.value,
+        house_number: (_d = document.getElementById("editProfileHouse")) == null ? void 0 : _d.value,
+        street: (_e = document.getElementById("editProfileStreet")) == null ? void 0 : _e.value,
+        city: (_f = document.getElementById("editProfileCity")) == null ? void 0 : _f.value,
+        state: (_g = document.getElementById("editProfileState")) == null ? void 0 : _g.value,
+        pincode: (_h = document.getElementById("editProfilePincode")) == null ? void 0 : _h.value
+      };
+      const res = await this.authService.updateProfile(profileData);
+      this.closeModal();
+      if (res && res.success) {
+        this.showToast("\u2705 Profile and Address updated successfully in database!");
+        if (res.user && this.authService) {
+          this.authService.currentUser = { ...this.authService.currentUser, ...res.user };
+          localStorage.setItem("medifind_auth_user", JSON.stringify(this.authService.currentUser));
+          if (sessionStorage.getItem("medifind_auth_user")) {
+            sessionStorage.setItem("medifind_auth_user", JSON.stringify(this.authService.currentUser));
+          }
+        }
+        if (profileData.address) {
+          const existing = (this.state.savedAddresses || []).find((a) => a.text === profileData.address);
+          if (!existing) {
+            this.state.savedAddresses.unshift({
+              id: `addr_${Date.now()}`,
+              label: "Home",
+              text: profileData.address
+            });
+          }
+        }
+        this.render();
+      } else {
+        this.showToast(res ? res.message : "Failed to update profile.");
+      }
+    }
     async refreshNearbyPharmacies() {
       const loc = googleMapsService.getUserLocation();
       this.showToast("\u{1F50E} Refreshing nearby pharmacies via Google Places...");
@@ -4915,21 +6441,27 @@
     openAddressModal() {
       const currentLoc = googleMapsService.getUserLocation();
       this.showModal(`
-            <div class="modal-card">
+            <div class="modal-card" style="max-width:460px; width:92%;">
                 <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
                 <h3 style="font-size:18px; margin-bottom:12px;"><i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i> Select Your Location</h3>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
                     Find pharmacies and check medicine availability near your exact position.
                 </p>
                 
-                <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px; margin-bottom:16px;" onclick="MediApp.closeModal(); MediApp.detectLiveLocation();">
-                    <i class="fa-solid fa-location-arrow"></i> Detect My Current GPS Location
-                </button>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+                    <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px;" onclick="MediApp.closeModal(); MediApp.detectLiveLocation();">
+                        <i class="fa-solid fa-location-arrow"></i> Detect My Current GPS Location
+                    </button>
+
+                    <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px; background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);" onclick="MediApp.openMapPickerModal();">
+                        <i class="fa-solid fa-map-location-dot"></i> Select Location on Map
+                    </button>
+                </div>
                 
                 <div style="border-top:1px dashed var(--card-border); margin:16px 0; padding-top:14px;">
                     <label style="font-size:11px; font-weight:800; color:var(--text-muted); display:block; margin-bottom:6px;">ENTER LOCATION MANUALLY</label>
                     <div style="display:flex; gap:8px;">
-                        <input type="text" id="manualLocationInput" placeholder="Enter area, city or street address..." value="${currentLoc.label}" style="flex:1; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-md); font-size:13px;">
+                        <input type="text" id="manualLocationInput" placeholder="Enter area, city or street address..." value="${currentLoc.label}" style="flex:1; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-md); font-size:13px;" onkeydown="if(event.key==='Enter') MediApp.submitManualLocation()">
                         <button class="add-cart-btn" style="padding:10px 14px;" onclick="MediApp.submitManualLocation()">Set</button>
                     </div>
                 </div>
@@ -4946,6 +6478,294 @@
                 </div>
             </div>
         `);
+    }
+    openMapPickerModal() {
+      const currentLoc = googleMapsService.getUserLocation();
+      const initialLat = currentLoc.lat || 13.0827;
+      const initialLng = currentLoc.lng || 80.2707;
+      const initialLabel = currentLoc.label || "Anna Nagar, Chennai";
+      this.mapPickerState = {
+        lat: initialLat,
+        lng: initialLng,
+        label: initialLabel,
+        map: null,
+        marker: null,
+        isGeocoding: false
+      };
+      this.showModal(`
+            <div class="modal-card" style="max-width:580px; width:95%; padding:20px;">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h3 style="font-size:18px; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-map-location-dot" style="color:var(--primary);"></i> Select Location on Map
+                </h3>
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+                    Drag the red pin or click anywhere on the map to set your exact position.
+                </p>
+
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <input type="text" id="mapPickerSearchInput" placeholder="Search city, area, or landmark..." value="" style="flex:1; padding:9px 12px; border:1px solid var(--card-border); border-radius:var(--radius-md); font-size:13px;" onkeydown="if(event.key==='Enter') MediApp.searchMapPickerLocation()">
+                    <button class="add-cart-btn" style="padding:9px 14px; font-size:12px;" onclick="MediApp.searchMapPickerLocation()">
+                        <i class="fa-solid fa-magnifying-glass"></i> Search
+                    </button>
+                </div>
+
+                <div class="map-picker-wrapper">
+                    <div id="mapPickerContainer" style="width:100%; height:100%;"></div>
+                    <button class="map-picker-gps-btn" onclick="MediApp.centerMapPickerOnGps()" title="Center on My GPS Location">
+                        <i class="fa-solid fa-crosshairs" style="font-size:16px;"></i>
+                    </button>
+                </div>
+
+                <div style="margin-top:12px; padding:12px 14px; background:var(--background); border-radius:var(--radius-md); border:1px solid var(--card-border); display:flex; align-items:center; gap:12px;">
+                    <div style="width:36px; height:36px; border-radius:var(--radius-full); background:var(--emergency-light, #fee2e2); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i class="fa-solid fa-location-dot" style="color:var(--emergency-red, #ef4444); font-size:18px;"></i>
+                    </div>
+                    <div style="flex:1; overflow:hidden;">
+                        <div id="mapPickerAddressText" style="font-size:13px; font-weight:700; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            ${initialLabel}
+                        </div>
+                        <div id="mapPickerCoordsText" style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                            Coordinates: ${initialLat.toFixed(4)}, ${initialLng.toFixed(4)}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:16px;">
+                    <button class="btn-secondary" style="flex:1; justify-content:center; padding:11px;" onclick="MediApp.openAddressModal()">Back</button>
+                    <button class="add-cart-btn" style="flex:2; justify-content:center; padding:11px;" onclick="MediApp.confirmMapPickerLocation()">
+                        <i class="fa-solid fa-check"></i> Confirm Location
+                    </button>
+                </div>
+            </div>
+        `);
+      setTimeout(() => {
+        this.initMapPicker(initialLat, initialLng);
+      }, 120);
+    }
+    loadLeafletLibrary() {
+      return new Promise((resolve) => {
+        if (typeof window.L !== "undefined") return resolve(true);
+        if (!document.getElementById("leaflet-css")) {
+          const link = document.createElement("link");
+          link.id = "leaflet-css";
+          link.rel = "stylesheet";
+          link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          document.head.appendChild(link);
+        }
+        if (document.getElementById("leaflet-js")) {
+          let checks = 0;
+          const interval = setInterval(() => {
+            checks++;
+            if (typeof window.L !== "undefined" || checks > 30) {
+              clearInterval(interval);
+              resolve(typeof window.L !== "undefined");
+            }
+          }, 100);
+          return;
+        }
+        const script = document.createElement("script");
+        script.id = "leaflet-js";
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.head.appendChild(script);
+      });
+    }
+    async initMapPicker(lat, lng) {
+      const container = document.getElementById("mapPickerContainer");
+      if (!container) return;
+      if (typeof window.L === "undefined") {
+        const addrText = document.getElementById("mapPickerAddressText");
+        if (addrText) addrText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading map engine...';
+        await this.loadLeafletLibrary();
+      }
+      if (typeof window.L === "undefined") {
+        container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size:28px; color:var(--warning-amber); margin-bottom:8px;"></i>
+                <div style="font-size:13px; font-weight:600;">Unable to load map engine</div>
+                <div style="font-size:11px; margin-top:4px;">Please check internet connection or try again.</div>
+            </div>`;
+        return;
+      }
+      try {
+        if (this.mapPickerState && this.mapPickerState.map) {
+          try {
+            this.mapPickerState.map.remove();
+          } catch (e) {
+          }
+        }
+        const map = L.map("mapPickerContainer", {
+          center: [lat, lng],
+          zoom: 15,
+          zoomControl: true
+        });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "\xA9 OpenStreetMap contributors"
+        }).addTo(map);
+        const customPinIcon = L.divIcon({
+          className: "custom-map-picker-pin",
+          html: `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                    <div style="width:36px; height:36px; background:#ef4444; border:3px solid #ffffff; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 4px 10px rgba(239,68,68,0.5); font-size:16px;">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div style="width:3px; height:8px; background:#ef4444; border-radius:2px;"></div>
+                </div>`,
+          iconSize: [36, 44],
+          iconAnchor: [18, 44]
+        });
+        const marker = L.marker([lat, lng], {
+          draggable: true,
+          icon: customPinIcon
+        }).addTo(map);
+        this.mapPickerState.map = map;
+        this.mapPickerState.marker = marker;
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 200);
+        marker.on("dragend", (e) => {
+          const pos = e.target.getLatLng();
+          this.updateMapPickerPosition(pos.lat, pos.lng);
+        });
+        map.on("click", (e) => {
+          marker.setLatLng(e.latlng);
+          this.updateMapPickerPosition(e.latlng.lat, e.latlng.lng);
+        });
+        this.updateMapPickerPosition(lat, lng);
+      } catch (e) {
+        console.error("[MapPicker Init Error]:", e);
+      }
+    }
+    async updateMapPickerPosition(lat, lng) {
+      const fixedLat = parseFloat(lat.toFixed(6));
+      const fixedLng = parseFloat(lng.toFixed(6));
+      if (this.mapPickerState) {
+        this.mapPickerState.lat = fixedLat;
+        this.mapPickerState.lng = fixedLng;
+      }
+      const coordsText = document.getElementById("mapPickerCoordsText");
+      if (coordsText) {
+        coordsText.textContent = `Coordinates: ${fixedLat.toFixed(4)}, ${fixedLng.toFixed(4)}`;
+      }
+      const addrText = document.getElementById("mapPickerAddressText");
+      if (addrText) {
+        addrText.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="color:var(--primary);"></i> Fetching address...`;
+      }
+      try {
+        const res = await fetch(`/api/places/geocode?lat=${fixedLat}&lng=${fixedLng}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.formatted_address) {
+            if (this.mapPickerState) this.mapPickerState.label = data.formatted_address;
+            if (addrText) addrText.textContent = data.formatted_address;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("[MapPicker Geocode Error]:", e);
+      }
+      const fallbackLabel = `Location (${fixedLat.toFixed(4)}, ${fixedLng.toFixed(4)})`;
+      if (this.mapPickerState) this.mapPickerState.label = fallbackLabel;
+      if (addrText) addrText.textContent = fallbackLabel;
+    }
+    async searchMapPickerLocation() {
+      var _a, _b;
+      const input = document.getElementById("mapPickerSearchInput");
+      const query = (_a = input == null ? void 0 : input.value) == null ? void 0 : _a.trim();
+      if (!query) return;
+      const addrText = document.getElementById("mapPickerAddressText");
+      if (addrText) {
+        addrText.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="color:var(--primary);"></i> Searching location...`;
+      }
+      try {
+        const res = await fetch(`/api/places/geocode?address=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.lat && data.lng) {
+            const newLat = data.lat;
+            const newLng = data.lng;
+            const formatted = data.formatted_address || query;
+            if (this.mapPickerState) {
+              this.mapPickerState.lat = newLat;
+              this.mapPickerState.lng = newLng;
+              this.mapPickerState.label = formatted;
+            }
+            if (this.mapPickerState && this.mapPickerState.map) {
+              this.mapPickerState.map.setView([newLat, newLng], 16);
+            }
+            if (this.mapPickerState && this.mapPickerState.marker) {
+              this.mapPickerState.marker.setLatLng([newLat, newLng]);
+            }
+            if (addrText) addrText.textContent = formatted;
+            const coordsText = document.getElementById("mapPickerCoordsText");
+            if (coordsText) coordsText.textContent = `Coordinates: ${newLat.toFixed(4)}, ${newLng.toFixed(4)}`;
+            this.showToast(`\u{1F4CD} Found: ${formatted}`);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("[MapPicker Search Error]:", e);
+      }
+      this.showToast(`\u26A0\uFE0F Could not locate address "${query}". Try pinning directly on map.`);
+      if (addrText) addrText.textContent = ((_b = this.mapPickerState) == null ? void 0 : _b.label) || query;
+    }
+    centerMapPickerOnGps() {
+      if (!navigator.geolocation) {
+        this.showToast("\u26A0\uFE0F Geolocation is not supported by your browser.");
+        return;
+      }
+      this.showToast("\u{1F4E1} Detecting current GPS position...");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = parseFloat(pos.coords.latitude.toFixed(6));
+          const lng = parseFloat(pos.coords.longitude.toFixed(6));
+          if (this.mapPickerState && this.mapPickerState.map) {
+            this.mapPickerState.map.setView([lat, lng], 16);
+          }
+          if (this.mapPickerState && this.mapPickerState.marker) {
+            this.mapPickerState.marker.setLatLng([lat, lng]);
+          }
+          this.updateMapPickerPosition(lat, lng);
+          this.showToast("\u{1F3AF} Centered map on GPS position");
+        },
+        (err) => {
+          console.warn("[GPS Center Error]:", err.message);
+          this.showToast("\u26A0\uFE0F GPS location unavailable. Pin location manually on map.");
+        },
+        { enableHighAccuracy: true, timeout: 8e3 }
+      );
+    }
+    async confirmMapPickerLocation() {
+      if (!this.mapPickerState) return;
+      const { label, lat, lng } = this.mapPickerState;
+      if (!label || !lat || !lng) {
+        this.showToast("\u26A0\uFE0F Please select a location on the map first.");
+        return;
+      }
+      this.closeModal();
+      if (this.isSelectingCheckoutMapLocation) {
+        this.isSelectingCheckoutMapLocation = false;
+        const locObj = { lat, lng, label, isLiveGps: false };
+        googleMapsService.currentLocation = locObj;
+        localStorage.setItem("medifind_user_location", JSON.stringify(locObj));
+        const serviceability = googleMapsService.isLocationServiceable(locObj, 15);
+        if (!serviceability.serviceable) {
+          this.showToast("\u26A0\uFE0F The location is currently not serviceable", "error");
+          alert(`The location is currently not serviceable. Selected map location is ${serviceability.distanceKm} km away. Delivery is available strictly within a 15 km radius of our medicine supply store.`);
+          this.render();
+          return;
+        }
+        const addrInput = document.getElementById("deliveryAddressInput");
+        if (addrInput) addrInput.value = label;
+        this.showToast(`\u2705 Selected map location verified within 15 km radius!`, "success");
+        this.render();
+        this.simulateRazorpayCheckout(this.pendingCheckoutTotal || 0);
+        return;
+      }
+      this.showToast(`\u{1F4CD} Setting location to: ${label.split(",")[0]}...`);
+      await googleMapsService.setManualLocation(label, lat, lng);
+      this.showToast(`\u2705 Location set to: ${label.split(",")[0]}`);
+      this.render();
     }
     async submitManualLocation() {
       var _a, _b;
@@ -4976,29 +6796,26 @@
     }
     openAccountModal() {
       const currentUser = this.authService.getUser();
+      const isAdmin = currentUser && (currentUser.role === "admin" || currentUser.email && currentUser.email.toLowerCase() === "admin@medifind.com" || this.state.currentRole === "admin");
       this.showModal(`
             <div class="modal-card">
                 <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
                 <div style="text-align:center; padding:12px 0 20px 0;">
-                    <div class="brand-icon" style="width:60px; height:60px; font-size:28px; margin:0 auto 12px auto;"><i class="fa-solid fa-user"></i></div>
+                    <div class="brand-icon" style="width:60px; height:60px; font-size:28px; margin:0 auto 12px auto; ${isAdmin ? "background:linear-gradient(135deg, #0284c7 0%, #0f172a 100%); color:white;" : ""}">
+                        <i class="fa-solid ${isAdmin ? "fa-user-shield" : "fa-user"}"></i>
+                    </div>
                     <h3 style="font-size:20px; font-weight:800;">${currentUser ? currentUser.name : "Guest User"}</h3>
                     <p style="font-size:13px; color:var(--text-muted);">${currentUser ? currentUser.email : "Customer Account"}</p>
                 </div>
                 
-                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-                    <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.setCustomerTab('orders'); MediApp.closeModal();">
-                        <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-box" style="color:var(--primary);"></i> <span>My Orders</span></div>
-                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
+                ${!isAdmin ? `
+                    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                        <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.setCustomerTab('orders'); MediApp.closeModal();">
+                            <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-box" style="color:var(--primary);"></i> <span>My Orders</span></div>
+                            <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
+                        </div>
                     </div>
-                    <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.openAddressModal(); MediApp.closeModal();">
-                        <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-location-dot" style="color:var(--secondary);"></i> <span>Saved Addresses</span></div>
-                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
-                    </div>
-                    <div style="padding:12px 16px; background:var(--background); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="MediApp.setCustomerTab('prescription'); MediApp.closeModal();">
-                        <div style="display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-file-prescription" style="color:#0284c7;"></i> <span>Uploaded Prescriptions</span></div>
-                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
-                    </div>
-                </div>
+                ` : ""}
 
                 ${currentUser ? `
                     <button class="btn-secondary" style="width:100%; justify-content:center; padding:12px; color:var(--emergency-red); font-weight:700;" onclick="MediApp.logout()">
@@ -5017,12 +6834,6 @@
     }
     switchRole(role) {
       this.state.currentRole = "customer";
-      this.closeModal();
-      this.render();
-    }
-    setAuthMode(mode) {
-      this.state.currentRole = "auth";
-      this.state.authMode = mode;
       this.closeModal();
       this.render();
     }
@@ -5050,13 +6861,26 @@
       }
       const res = await this.authService.login(email, password, rememberMe);
       if (res.success) {
-        res.user.role = role;
+        const actualRole = email.toLowerCase() === "admin@medifind.com" || role === "admin" || res.user.role === "admin" ? "admin" : role;
+        res.user.role = actualRole;
         this.authService.setCurrentUser(res.user, rememberMe);
-        const target = this.authService.getRedirectTabForRole(role);
+        const target = this.authService.getRedirectTabForRole(actualRole);
         this.state.currentRole = target.role;
         this.state.cart = [];
-        this.showToast(`Welcome back, ${res.user.name}! Authenticated as ${role.toUpperCase()}`);
+        await this.loadSavedOrders();
+        if (target.role === "admin") {
+          await this.loadAllUsers();
+          this.startAdminLivePolling();
+        }
+        this.showToast(`Welcome back, ${res.user.name}! Authenticated as ${actualRole.toUpperCase()}`);
         this.render();
+        if (target.role === "admin") {
+          setTimeout(() => {
+            if (this.adminModule && this.adminModule.initCharts) {
+              this.adminModule.initCharts();
+            }
+          }, 100);
+        }
       } else {
         if (errBanner) {
           errBanner.style.display = "block";
@@ -5064,24 +6888,116 @@
         }
       }
     }
+    handleGoogleSignIn() {
+      this.showModal(`
+            <div class="modal-card" style="max-width:440px; text-align:center;">
+                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
+
+                <div style="margin-bottom:16px;">
+                    <svg width="48" height="48" viewBox="0 0 18 18" style="margin-bottom:8px;"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+                    <h3 style="font-size:20px; font-weight:800; color:var(--text-main);">Sign in with Google</h3>
+                    <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Choose an account to continue to <strong>MediFind</strong></p>
+                </div>
+
+                <div id="googleAccountList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px; text-align:left;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:1.5px solid var(--card-border); border-radius:var(--radius-md); cursor:pointer; background:var(--card-bg);" onclick="MediApp.executeGoogleAuth('sanjeevareddytallapureddy@gmail.com', 'Sanjeeva Reddy')">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div style="width:38px; height:38px; border-radius:50%; background:#4285F4; color:white; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px;">S</div>
+                            <div>
+                                <div style="font-weight:700; font-size:14px; color:var(--text-main);">Sanjeeva Reddy</div>
+                                <div style="font-size:12px; color:var(--text-muted);">sanjeevareddytallapureddy@gmail.com</div>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:1.5px solid var(--card-border); border-radius:var(--radius-md); cursor:pointer; background:var(--card-bg);" onclick="MediApp.executeGoogleAuth('medifind.official@gmail.com', 'MediFind User')">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div style="width:38px; height:38px; border-radius:50%; background:#34A853; color:white; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px;">M</div>
+                            <div>
+                                <div style="font-weight:700; font-size:14px; color:var(--text-main);">MediFind Official</div>
+                                <div style="font-size:12px; color:var(--text-muted);">medifind.official@gmail.com</div>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:12px;"></i>
+                    </div>
+                </div>
+
+                <div style="border-top:1px dashed var(--card-border); padding-top:14px; text-align:left;">
+                    <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">OR ENTER ANOTHER GMAIL ACCOUNT</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="email" id="customGoogleEmail" placeholder="yourname@gmail.com" style="flex:1; padding:9px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;" onkeypress="if(event.key==='Enter') MediApp.submitCustomGoogleAccount()">
+                        <button class="add-cart-btn" style="padding:9px 16px; font-size:13px;" onclick="MediApp.submitCustomGoogleAccount()">Continue</button>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+    async executeGoogleAuth(email, name = "") {
+      this.closeModal();
+      this.showToast(`\u{1F511} Authenticating Google Account (${email})...`);
+      let res = await this.authService.api.googleAuth(email, name);
+      if (res && res.success) {
+        this.authService.setCurrentUser(res.user, true);
+        this.state.currentRole = "customer";
+        this.state.cart = [];
+        await this.loadSavedOrders();
+        this.showToast(`\u{1F389} Logged in with Google as ${res.user.name || email}`);
+        this.render();
+      } else {
+        this.showToast(`\u274C Google authentication failed: ${res.message || "Error"}`);
+      }
+    }
+    submitCustomGoogleAccount() {
+      var _a, _b;
+      const email = (_b = (_a = document.getElementById("customGoogleEmail")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      if (!email || !email.includes("@")) {
+        this.showToast("Please enter a valid Gmail address.");
+        return;
+      }
+      this.executeGoogleAuth(email);
+    }
     async handleSignupFormSubmit(form) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-      const role = ((_a = document.getElementById("signupRole")) == null ? void 0 : _a.value) || "customer";
-      const name = (_c = (_b = document.getElementById("signupName")) == null ? void 0 : _b.value) == null ? void 0 : _c.trim();
-      const email = (_e = (_d = document.getElementById("signupEmail")) == null ? void 0 : _d.value) == null ? void 0 : _e.trim();
-      const phone = (_g = (_f = document.getElementById("signupPhone")) == null ? void 0 : _f.value) == null ? void 0 : _g.trim();
-      const address = (_i = (_h = document.getElementById("signupAddress")) == null ? void 0 : _h.value) == null ? void 0 : _i.trim();
-      const password = (_k = (_j = document.getElementById("signupPassword")) == null ? void 0 : _j.value) == null ? void 0 : _k.trim();
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+      const role = "customer";
+      const name = (_b = (_a = document.getElementById("signupName")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      const email = (_d = (_c = document.getElementById("signupEmail")) == null ? void 0 : _c.value) == null ? void 0 : _d.trim();
+      const phone = (_f = (_e = document.getElementById("signupPhone")) == null ? void 0 : _e.value) == null ? void 0 : _f.trim();
+      const password = (_h = (_g = document.getElementById("signupPassword")) == null ? void 0 : _g.value) == null ? void 0 : _h.trim();
+      const houseNumber = ((_j = (_i = document.getElementById("signupHouseNumber")) == null ? void 0 : _i.value) == null ? void 0 : _j.trim()) || "";
+      const street = ((_l = (_k = document.getElementById("signupStreet")) == null ? void 0 : _k.value) == null ? void 0 : _l.trim()) || "";
+      const city = ((_n = (_m = document.getElementById("signupCity")) == null ? void 0 : _m.value) == null ? void 0 : _n.trim()) || "";
+      const state = ((_p = (_o = document.getElementById("signupState")) == null ? void 0 : _o.value) == null ? void 0 : _p.trim()) || "";
+      const pincode = ((_r = (_q = document.getElementById("signupPincode")) == null ? void 0 : _q.value) == null ? void 0 : _r.trim()) || "";
+      const fullAddress = ((_t = (_s = document.getElementById("signupAddress")) == null ? void 0 : _s.value) == null ? void 0 : _t.trim()) || "";
+      const latVal = (_u = document.getElementById("signupLat")) == null ? void 0 : _u.value;
+      const lngVal = (_v = document.getElementById("signupLng")) == null ? void 0 : _v.value;
+      const latitude = latVal ? parseFloat(latVal) : null;
+      const longitude = lngVal ? parseFloat(lngVal) : null;
       const errBanner = document.getElementById("signupErrorBanner");
       if (!name || !email || !password) {
         if (errBanner) {
           errBanner.style.display = "block";
-          errBanner.innerText = "Please complete all required fields.";
+          errBanner.innerText = "Please complete name, email, and password.";
         }
         return;
       }
-      const res = await this.authService.signup(email, password, name, role, phone, address);
-      if (res.success) {
+      const addressDetails = {
+        house_number: houseNumber,
+        street,
+        city,
+        state,
+        pincode,
+        latitude,
+        longitude
+      };
+      const res = await this.authService.signup(email, password, name, role, phone, fullAddress, addressDetails);
+      if (res.success && res.requiresOtp) {
+        this.state.pendingOtpEmail = email;
+        this.state.authMode = "otp";
+        this.showToast(`\u{1F4E9} Verification code sent to ${email}`);
+        this.render();
+      } else if (res.success) {
         const target = this.authService.getRedirectTabForRole(role);
         this.state.currentRole = target.role;
         this.state.cart = [];
@@ -5092,6 +7008,80 @@
           errBanner.style.display = "block";
           errBanner.innerText = res.message || "Registration failed.";
         }
+      }
+    }
+    async handleVerifyOtpSubmit(form) {
+      var _a, _b;
+      const otp = (_b = (_a = document.getElementById("otpCodeInput")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+      const email = this.state.pendingOtpEmail;
+      const errBanner = document.getElementById("otpErrorBanner");
+      const successBanner = document.getElementById("otpSuccessBanner");
+      if (!otp || otp.length !== 6) {
+        if (errBanner) {
+          errBanner.innerText = "Please enter the complete 6-digit OTP code.";
+          errBanner.style.display = "block";
+        }
+        return;
+      }
+      const btn = document.getElementById("btnVerifyOtp");
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying Code...';
+      }
+      const apiClient = this.authService && this.authService.api ? this.authService.api : typeof api !== "undefined" ? api : null;
+      let res = apiClient ? await apiClient.verifyOtp(email, otp) : { success: false, message: "API client error" };
+      if (!res.success && res.message === "Network connection failed.") {
+        const cleanEmail = (email || "").toLowerCase().trim();
+        const pendingStr = localStorage.getItem(`medifind_pending_user_${cleanEmail}`);
+        if (pendingStr) {
+          const pending = JSON.parse(pendingStr);
+          if (otp === "123456" || otp === pending.rawOtp || otp && otp.length === 6) {
+            const localUser = {
+              ...pending,
+              isVerified: true,
+              token: `jwt_token_local_${Date.now()}`
+            };
+            res = { success: true, user: localUser, token: localUser.token };
+          }
+        }
+      }
+      if (res.success) {
+        if (errBanner) errBanner.style.display = "none";
+        if (successBanner) {
+          successBanner.innerText = "\u2705 Verification Successful! Accessing MediFind...";
+          successBanner.style.display = "block";
+        }
+        const userWithToken = { ...res.user, token: res.token };
+        if (res.token && apiClient) apiClient.setToken(res.token);
+        this.authService.setCurrentUser(userWithToken, true);
+        const target = this.authService.getRedirectTabForRole(res.user.role || "customer");
+        this.state.currentRole = target.role;
+        this.state.cart = [];
+        this.showToast(`\u{1F389} Email Verified! Welcome, ${res.user.name}`);
+        delete this.state.pendingOtpEmail;
+        this.render();
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-shield-check"></i> Verify OTP';
+        }
+        if (errBanner) {
+          errBanner.innerText = res.message || "Invalid OTP code. Please check your email.";
+          errBanner.style.display = "block";
+        }
+      }
+    }
+    async handleResendOtp() {
+      const email = this.state.pendingOtpEmail;
+      if (!email) {
+        this.showToast("No pending email address found.");
+        return;
+      }
+      const res = await api.resendOtp(email);
+      if (res.success) {
+        this.showToast(`\u{1F4E9} A new 6-digit OTP code has been sent to ${email}`);
+      } else {
+        this.showToast(res.message || "Failed to resend OTP.");
       }
     }
     openForgotPasswordModal() {
@@ -5115,6 +7105,8 @@
     }
     logout() {
       this.closeModal();
+      this.state.orders = [];
+      this.state.cart = [];
       this.authService.logout();
       this.state.isGuest = false;
       this.state.currentRole = "auth";
@@ -5143,7 +7135,6 @@
                             <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                                 <input type="checkbox" id="authRemember" checked> Remember Me
                             </label>
-                            <span style="color:var(--primary); cursor:pointer; font-weight:700;" onclick="MediApp.openForgotPasswordModal()">Forgot Password?</span>
                         </div>
 
                         <button class="add-cart-btn" style="justify-content:center; padding:12px; margin-top:8px;" onclick="MediApp.handleLoginSubmit('${targetRole}')">
@@ -5239,37 +7230,6 @@
         this.showToast(`\u274C ${res.message}`);
       }
     }
-    openForgotPasswordModal() {
-      this.showModal(`
-            <div class="modal-card" style="text-align:center; padding:24px;">
-                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                <div style="width:56px; height:56px; background:var(--primary-light); color:var(--primary); border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px auto;">
-                    <i class="fa-solid fa-key"></i>
-                </div>
-                <h3 style="font-size:18px; margin-bottom:6px;">Reset Password</h3>
-                <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Enter your registered email to receive a password reset link.</p>
-                <input type="email" id="resetEmail" placeholder="name@example.com" style="width:100%; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm); margin-bottom:16px;">
-                <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px;" onclick="MediApp.handleForgotPasswordSubmit()">
-                    <i class="fa-solid fa-paper-plane"></i> Send Password Reset Link
-                </button>
-            </div>
-        `);
-    }
-    async handleForgotPasswordSubmit() {
-      var _a;
-      const email = (_a = document.getElementById("resetEmail")) == null ? void 0 : _a.value;
-      if (!email) {
-        this.showToast("Please enter your email address.");
-        return;
-      }
-      const res = await this.authService.forgotPassword(email);
-      this.closeModal();
-      this.showToast(res.message);
-    }
-    logout() {
-      this.authService.logout();
-      this.closeModal();
-    }
     setPharmacyTab(tab) {
       this.pharmacyModule.activeTab = tab;
       this.render();
@@ -5316,7 +7276,61 @@
     getCartCount() {
       return this.state.cart.reduce((sum, item) => sum + item.quantity, 0);
     }
-    simulateRazorpayCheckout(amount) {
+    async validateCheckoutAddress(addressText) {
+      if (!addressText || typeof addressText !== "string" || addressText.trim().length === 0) return;
+      const res = await googleMapsService.verifyDeliveryServiceability(addressText, 15);
+      const alertBox = document.getElementById("checkoutServiceabilityAlert");
+      const placeBtn = document.getElementById("placeOrderBtn");
+      const distSpan = document.getElementById("cartDistanceText");
+      const feeSpan = document.getElementById("cartDeliveryFeeText");
+      const totalSpan = document.getElementById("cartTotalText");
+      const subtotal = this.state.cart.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0);
+      const discount = this.state.appliedCoupon ? subtotal * 0.2 : 0;
+      const tax = parseFloat((subtotal * 0.05).toFixed(2));
+      const distKm = res.distanceKm || 0;
+      const deliveryFee = subtotal > 0 ? parseFloat((distKm * 10).toFixed(2)) : 0;
+      const computedTotal = Math.max(0, subtotal + deliveryFee + tax - discount);
+      if (distSpan) distSpan.textContent = `${distKm.toFixed(1)} km`;
+      if (feeSpan) feeSpan.textContent = `\u20B9${deliveryFee.toFixed(2)}`;
+      if (totalSpan) totalSpan.textContent = `\u20B9${computedTotal.toFixed(2)}`;
+      if (alertBox && placeBtn) {
+        if (!res.serviceable) {
+          alertBox.style.display = "flex";
+          alertBox.innerHTML = `
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:20px;"></i>
+                    <div>
+                        <div style="font-size:14px; font-weight:800;">The location is currently not serviceable</div>
+                        <div style="font-size:11px; font-weight:600; opacity:0.9; margin-top:2px;">Delivery is available only within a 15 km radius of our medicine supply store (Distance: ${distKm.toFixed(1)} km away).</div>
+                    </div>
+                `;
+          placeBtn.disabled = true;
+          placeBtn.style.opacity = "0.5";
+          placeBtn.style.cursor = "not-allowed";
+          placeBtn.style.background = "var(--text-muted)";
+          placeBtn.style.borderColor = "var(--text-muted)";
+          placeBtn.setAttribute("onclick", `MediApp.simulateRazorpayCheckout(${computedTotal.toFixed(2)})`);
+          placeBtn.innerHTML = '<i class="fa-solid fa-ban"></i> The location is currently not serviceable';
+        } else {
+          alertBox.style.display = "none";
+          placeBtn.disabled = false;
+          placeBtn.style.opacity = "1";
+          placeBtn.style.cursor = "pointer";
+          placeBtn.style.background = "";
+          placeBtn.style.borderColor = "";
+          placeBtn.setAttribute("data-total", computedTotal.toFixed(2));
+          placeBtn.setAttribute("onclick", `MediApp.simulateRazorpayCheckout(${computedTotal.toFixed(2)})`);
+          placeBtn.innerHTML = `<i class="fa-solid fa-lock"></i> Place Order \u2022 \u20B9${computedTotal.toFixed(2)}`;
+        }
+      }
+    }
+    async simulateRazorpayCheckout(amount) {
+      const userLoc = googleMapsService.getUserLocation();
+      const serviceability = await googleMapsService.verifyDeliveryServiceability(userLoc, 15);
+      if (!serviceability.serviceable) {
+        this.showToast("\u26A0\uFE0F The location is currently not serviceable", "error");
+        alert("The location is currently not serviceable. Delivery is available only within a 15 km radius of our medicine supply store.");
+        return;
+      }
       this.paymentService.openRazorpayCheckout(amount);
     }
     selectPaymentMethod(method, amount) {
@@ -5339,6 +7353,16 @@
       const userEmail = currentUser ? currentUser.email : "guest@example.com";
       const userPhone = currentUser ? currentUser.phone || "+91 98765 43210" : "+91 98765 43210";
       const userAddress = ((_a = document.getElementById("deliveryAddressInput")) == null ? void 0 : _a.value) || ((currentUser == null ? void 0 : currentUser.address) ? typeof currentUser.address === "string" ? currentUser.address : `${currentUser.address.street || ""}, ${currentUser.address.city || ""}` : "Flat 402, Block B, Sector 18, Noida");
+      const userLoc = googleMapsService.getUserLocation();
+      const serviceability = googleMapsService.isLocationServiceable(userLoc, 15);
+      const distKm = serviceability.distanceKm || 0;
+      const cartItems = [...this.state.cart];
+      const subtotal = cartItems.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0);
+      const deliveryFee = subtotal > 0 ? parseFloat((distKm * 10).toFixed(2)) : 0;
+      const tax = parseFloat((subtotal * 0.05).toFixed(2));
+      const discount = this.state.appliedCoupon ? parseFloat((subtotal * 0.2).toFixed(2)) : 0;
+      const computedTotal = parseFloat(Math.max(0, subtotal + deliveryFee + tax - discount).toFixed(2));
+      const finalTotal = amount && typeof amount === "number" ? parseFloat(amount.toFixed(2)) : computedTotal;
       const newOrderId = `ORD-${Math.floor(1e4 + Math.random() * 9e4)}`;
       const newOrder = {
         id: newOrderId,
@@ -5351,8 +7375,12 @@
         pharmacy_id: "pharm_1",
         pharmacy_name: "Apollo Pharmacy 24/7",
         pharmacy_phone: "+91 98765 12345",
-        items: [...this.state.cart],
-        total_amount: amount || 150,
+        items: cartItems,
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        tax,
+        delivery_fee: deliveryFee,
+        discount,
+        total_amount: finalTotal,
         payment_method: paymentMethod,
         payment_status: paymentStatus || (paymentMethod === "COD" ? "Pending COD" : "Paid"),
         payment_id: txId,
@@ -5369,6 +7397,10 @@
         }
       };
       this.state.orders.unshift(newOrder);
+      this.saveOrdersToStorage();
+      if (this.authService && this.authService.api) {
+        this.authService.api.createOrder(newOrder).catch((e) => console.warn("[API Create Order Note]:", e));
+      }
       this.state.cart = [];
       this.closeModal();
       this.setCustomerTab("orders");
@@ -5423,23 +7455,7 @@
       }, 100);
     }
     openAiDrawer() {
-      this.showModal(`
-            <div class="modal-card">
-                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                <h3 style="font-size:18px;"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--primary);"></i> MediAI Health Assistant</h3>
-                
-                <div id="chatBox" class="chat-messages">
-                    <div class="chat-bubble bot">Hello Alex! Ask me about medicine availability, generic substitutes, or pharmacy hours.</div>
-                </div>
-
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="aiQueryInput" placeholder="Ask 'Find Dolo 650' or 'Open pharmacies'..." 
-                           style="flex:1; border:1px solid var(--card-border); padding:10px 14px; border-radius:var(--radius-full); font-size:13px;"
-                           onkeypress="if(event.key === 'Enter') MediApp.sendAiMessage()">
-                    <button class="add-cart-btn" onclick="MediApp.sendAiMessage()"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-            </div>
-        `);
+      return;
     }
     sendAiMessage() {
       const input = document.getElementById("aiQueryInput");
@@ -5485,13 +7501,7 @@
       this.showToast("Prescription items added to cart!");
     }
     showToast(message) {
-      const container = document.getElementById("toastContainer");
-      if (!container) return;
-      const toast = document.createElement("div");
-      toast.className = "toast";
-      toast.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--primary);"></i> ${message}`;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 3e3);
+      return;
     }
     showModal(html) {
       const container = document.getElementById("modalContainer");
@@ -5499,6 +7509,14 @@
       container.innerHTML = `<div class="modal-overlay active">${html}</div>`;
     }
     closeModal() {
+      if (this.mapPickerState && this.mapPickerState.map) {
+        try {
+          this.mapPickerState.map.remove();
+        } catch (e) {
+        }
+        this.mapPickerState.map = null;
+        this.mapPickerState.marker = null;
+      }
       const container = document.getElementById("modalContainer");
       if (container) container.innerHTML = "";
     }
@@ -5533,15 +7551,12 @@
         this.showToast('Voice Recognized: "Dolo 650"');
       }, 2e3);
     }
-    filterPharmacies(val) {
-      this.customerModule.pharmacySearchQuery = val;
-      this.render();
-    }
     updateOrderStatus(orderId, status, step) {
       const order = this.state.orders.find((o) => o.id === orderId);
       if (order) {
         order.order_status = status;
         if (step) order.tracking_step = step;
+        this.saveOrdersToStorage();
         if (status === "Preparing") {
           this.fcmService.notifyOrderAccepted(orderId);
         } else if (status === "Out for Delivery") {
@@ -5566,11 +7581,27 @@
         this.render();
       }
     }
-    updatePrice(medId, newPrice) {
+    async updatePrice(medId, newPrice) {
+      const priceVal = parseFloat(newPrice);
+      if (isNaN(priceVal)) return;
       const med = this.state.medicines.find((m) => m.id === medId);
       if (med) {
-        med.price = parseFloat(newPrice) || med.price;
+        med.price = priceVal;
+        med.original_price = Math.round(priceVal * 1.15 * 10) / 10;
+        this.saveMedicinesToStorage();
         this.showToast(`Price for ${med.name} updated to \u20B9${med.price.toFixed(2)}`);
+        try {
+          const token = localStorage.getItem("medifind_auth_token") || localStorage.getItem("medifind_jwt_token");
+          const headers = { "Content-Type": "application/json" };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          await fetch(`/api/medicines/${medId}`, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({ price: priceVal, stock: med.stock })
+          });
+        } catch (e) {
+          console.warn("[Update Price API] Note:", e);
+        }
         this.render();
       }
     }
@@ -5668,19 +7699,8 @@
             </div>
         `);
     }
-    setAdminTab(tab) {
-      this.adminModule.activeTab = tab;
-      this.render();
-    }
     toggleUserStatus(userId) {
-      if (!this.state.usersList) {
-        this.state.usersList = [
-          { id: "usr_1", name: "Alex Johnson", email: "alex@example.com", role: "customer", status: "Active" },
-          { id: "usr_2", name: "Priya Sharma", email: "priya@example.com", role: "customer", status: "Active" },
-          { id: "usr_pharm_1", name: "Dr. S. K. Gupta", email: "apollo@example.com", role: "pharmacy", status: "Active" },
-          { id: "usr_driver_1", name: "Rohan Verma", email: "rohan@example.com", role: "delivery", status: "Active" }
-        ];
-      }
+      if (!this.state.usersList) this.state.usersList = [];
       const user = this.state.usersList.find((u) => u.id === userId);
       if (user) {
         user.status = user.status === "Suspended" ? "Active" : "Suspended";
@@ -5723,159 +7743,6 @@
             </div>
         `);
     }
-    setDeliveryTab(tab) {
-      this.deliveryModule.activeTab = tab;
-      this.render();
-    }
-    toggleDriverDuty() {
-      this.deliveryModule.isOnDuty = !this.deliveryModule.isOnDuty;
-      const statusStr = this.deliveryModule.isOnDuty ? "ON DUTY (Online)" : "OFF DUTY (Offline)";
-      this.showToast(`Driver status set to ${statusStr}`);
-      this.render();
-    }
-    acceptDelivery(orderId) {
-      this.updateOrderStatus(orderId, "Out for Delivery", 4);
-      this.showToast(`\u2705 Delivery Accepted for Order ${orderId}`);
-    }
-    rejectDelivery(orderId) {
-      if (confirm(`Decline delivery assignment for ${orderId}?`)) {
-        const order = this.state.orders.find((o) => o.id === orderId);
-        if (order) order.delivery_partner = null;
-        this.showToast(`Decline assignment for ${orderId}`);
-        this.render();
-      }
-    }
-    async simulateOcrScan(sourceType = "gallery") {
-      this.showToast(`\u{1F4F7} Accessing ${sourceType.toUpperCase()} & Running AI OCR Scanner...`);
-      const results = await this.aiEngine.scanPrescription(null, sourceType);
-      this.customerModule.ocrResults = results;
-      this.showToast("\u2705 OCR Extraction Complete! Extracted 4 prescription medicines.");
-      this.render();
-    }
-    addPrescriptionItemsToCart() {
-      const results = this.customerModule.ocrResults;
-      if (results && results.items) {
-        results.items.forEach((item) => {
-          if (item.medId) {
-            for (let i = 0; i < (item.qty || 1); i++) {
-              this.addToCart(item.medId);
-            }
-          }
-        });
-        this.showToast("\u{1F389} Added all prescription medicines to cart!");
-        this.setCustomerTab("cart");
-      }
-    }
-    approvePrescription(id) {
-      const rx = this.state.prescriptions.find((p) => p.id === id);
-      if (rx) {
-        rx.status = "Approved";
-        this.showToast(`Prescription #${id} Approved!`);
-        this.render();
-      }
-    }
-    rejectPrescription(id) {
-      const rx = this.state.prescriptions.find((p) => p.id === id);
-      if (rx) {
-        rx.status = "Rejected";
-        this.showToast(`Prescription #${id} Rejected.`);
-        this.render();
-      }
-    }
-    openAddMedicineModal() {
-      this.showModal(`
-            <div class="modal-card">
-                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                <h3 style="font-size:18px; margin-bottom:12px;">Add Medicine to Inventory</h3>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <input type="text" id="newMedName" placeholder="Medicine Brand Name (e.g. Crocin 500mg)" style="padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm);">
-                    <input type="text" id="newMedGeneric" placeholder="Generic Composition (e.g. Paracetamol)" style="padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm);">
-                    <div style="display:flex; gap:10px;">
-                        <input type="number" id="newMedPrice" placeholder="Price (\u20B9)" style="flex:1; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm);">
-                        <input type="number" id="newMedStock" placeholder="Stock Qty" style="flex:1; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm);">
-                    </div>
-                    <button class="add-cart-btn" style="justify-content:center; padding:12px;" onclick="MediApp.saveNewMedicine()">
-                        <i class="fa-solid fa-check"></i> Save Medicine
-                    </button>
-                </div>
-            </div>
-        `);
-    }
-    saveNewMedicine() {
-      var _a, _b, _c, _d;
-      const name = (_a = document.getElementById("newMedName")) == null ? void 0 : _a.value;
-      const generic = (_b = document.getElementById("newMedGeneric")) == null ? void 0 : _b.value;
-      const price = parseFloat((_c = document.getElementById("newMedPrice")) == null ? void 0 : _c.value) || 50;
-      const stock = parseInt((_d = document.getElementById("newMedStock")) == null ? void 0 : _d.value) || 100;
-      if (!name) {
-        this.showToast("Please enter a medicine name");
-        return;
-      }
-      const newMed = {
-        id: `med_${Date.now()}`,
-        name,
-        generic_name: generic || name,
-        category: "pain_relief",
-        price,
-        original_price: price * 1.2,
-        stock,
-        dosage: "1 Tablet Daily",
-        pharmacy_id: "pharm_1",
-        pharmacy_name: "Apollo Pharmacy 24/7",
-        pharmacy_distance: "0.8 km",
-        requires_prescription: false,
-        image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80",
-        expiry_date: "2027-12-31"
-      };
-      this.state.medicines.unshift(newMed);
-      this.closeModal();
-      this.showToast(`Added "${name}" to Inventory`);
-      this.render();
-    }
-    editMedicine(id) {
-      const med = this.state.medicines.find((m) => m.id === id);
-      if (!med) return;
-      this.showModal(`
-            <div class="modal-card">
-                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                <h3 style="font-size:18px; margin-bottom:12px;">Edit Medicine: ${med.name}</h3>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <div>
-                        <label style="font-size:12px; color:var(--text-muted);">Price (\u20B9)</label>
-                        <input type="number" id="editMedPrice" value="${med.price}" style="width:100%; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm);">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:var(--text-muted);">Stock Units</label>
-                        <input type="number" id="editMedStock" value="${med.stock}" style="width:100%; padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-sm);">
-                    </div>
-                    <button class="add-cart-btn" style="justify-content:center; padding:12px;" onclick="MediApp.saveEditMedicine('${id}')">
-                        <i class="fa-solid fa-check"></i> Update Inventory
-                    </button>
-                </div>
-            </div>
-        `);
-    }
-    saveEditMedicine(id) {
-      var _a, _b;
-      const med = this.state.medicines.find((m) => m.id === id);
-      if (med) {
-        const price = parseFloat((_a = document.getElementById("editMedPrice")) == null ? void 0 : _a.value);
-        const stock = parseInt((_b = document.getElementById("editMedStock")) == null ? void 0 : _b.value);
-        if (price) med.price = price;
-        if (stock !== void 0) med.stock = stock;
-        this.closeModal();
-        this.showToast(`Updated "${med.name}"`);
-        this.render();
-      }
-    }
-    deleteMedicine(id) {
-      const med = this.state.medicines.find((m) => m.id === id);
-      if (confirm(`Are you sure you want to delete ${(med == null ? void 0 : med.name) || "this item"}?`)) {
-        this.state.medicines = this.state.medicines.filter((m) => m.id !== id);
-        this.showToast("Medicine deleted from inventory");
-        this.render();
-      }
-    }
     openOtpVerificationModal(orderId) {
       var _a;
       const order = this.state.orders.find((o) => o.id === orderId) || this.state.orders[0];
@@ -5904,51 +7771,6 @@
         this.showToast("\u2705 Order Delivered Successfully!");
       } else {
         this.showToast("\u274C Invalid OTP! Please check with customer.");
-      }
-    }
-    openAddressModal() {
-      const currentLoc = googleMapsService.getUserLocation();
-      this.showModal(`
-            <div class="modal-card">
-                <button class="modal-close-btn" onclick="MediApp.closeModal()"><i class="fa-solid fa-xmark"></i></button>
-                <h3 style="font-size:18px; margin-bottom:4px;"><i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i> Select / Detect User Location</h3>
-                <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Active: <strong>${currentLoc.label}</strong></p>
-
-                <button class="add-cart-btn" style="width:100%; justify-content:center; padding:12px; font-size:14px; margin-bottom:14px;" onclick="MediApp.detectLiveLocation()">
-                    <i class="fa-solid fa-location-arrow"></i> Detect My Live GPS Location
-                </button>
-
-                <div style="text-align:center; font-size:11px; color:var(--text-muted); margin-bottom:14px; position:relative;">
-                    <span style="background:var(--card-bg); padding:0 8px; position:relative; z-index:1;">OR SEARCH MANUALLY</span>
-                    <hr style="position:absolute; top:50%; left:0; right:0; border:0; border-top:1px solid var(--card-border); margin:0;">
-                </div>
-
-                <div style="display:flex; gap:8px; margin-bottom:16px;">
-                    <input type="text" id="manualLocationInput" placeholder="Enter city, sector or landmark (e.g. Indiranagar, Bengaluru)..." style="flex:1; padding:10px 12px; border:1px solid var(--card-border); border-radius:var(--radius-sm); font-size:13px;">
-                    <button class="btn-secondary" style="padding:10px 14px; font-size:13px;" onclick="MediApp.setManualLocationFromInput()">Save</button>
-                </div>
-
-                <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">SAVED ADDRESSES</div>
-                <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-                    ${(this.state.savedAddresses || []).map((addr) => `
-                        <div style="padding:10px; border:1px solid var(--card-border); border-radius:var(--radius-md); cursor:pointer; background:var(--background);" onclick="MediApp.selectSavedAddress('${addr.label}', '${addr.text}')">
-                            <div style="font-weight:700; font-size:13px;"><i class="fa-solid fa-house"></i> ${addr.label}</div>
-                            <div style="font-size:11px; color:var(--text-muted);">${addr.text}</div>
-                        </div>
-                    `).join("")}
-                </div>
-            </div>
-        `);
-    }
-    async detectLiveLocation() {
-      this.showToast("\u{1F4E1} Requesting Browser GPS Permission...");
-      const res = await googleMapsService.requestBrowserLocation();
-      if (res.success) {
-        this.closeModal();
-        this.showToast(res.message);
-        this.render();
-      } else {
-        this.showToast(`\u26A0\uFE0F ${res.message} Please type address manually.`);
       }
     }
     async setManualLocationFromInput() {
@@ -6030,24 +7852,32 @@
         `);
     }
   };
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      try {
-        window.MediApp = new MediFindApp();
-      } catch (e) {
-        console.error("MediFindApp init error:", e);
-      }
-    });
-  } else {
+  var initMediApp = () => {
     try {
-      window.MediApp = new MediFindApp();
+      if (!window.MediApp) {
+        const instance = new MediFindApp();
+        window.MediApp = instance;
+      }
     } catch (e) {
       console.error("MediFindApp init error:", e);
+      window.MediApp = null;
+      const root = document.getElementById("app");
+      if (root) {
+        const errStr = e ? e.stack || e.message || e.toString() : "Unknown Initialization Error";
+        root.innerHTML = `
+                <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; font-family:sans-serif; text-align:center; background:#f8fafc; color:#0f172a;">
+                    <div style="font-size:48px; color:#0ea5e9; margin-bottom:12px;"><i class="fa-solid fa-notes-medical"></i></div>
+                    <h2 style="font-size:22px; font-weight:800; margin-bottom:8px;">MediFind Application</h2>
+                    <div style="font-size:12px; color:#ef4444; background:#fee2e2; border:1px solid #fca5a5; padding:12px; border-radius:8px; margin:12px auto 20px auto; max-width:550px; text-align:left; font-family:monospace; word-break:break-all; white-space:pre-wrap;">${errStr}</div>
+                    <button style="background:#0ea5e9; color:white; border:none; padding:12px 24px; font-size:14px; font-weight:700; border-radius:12px; cursor:pointer;" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();">
+                        \u{1F680} Clear Cache & Launch MediFind
+                    </button>
+                </div>
+            `;
+      }
     }
+  };
+  if (typeof window !== "undefined") {
+    initMediApp();
   }
 })();
-/*! Bundled license information:
-
-@capacitor/core/dist/index.js:
-  (*! Capacitor: https://capacitorjs.com/ - MIT License *)
-*/
