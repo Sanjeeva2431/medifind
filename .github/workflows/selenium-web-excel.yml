@@ -27,7 +27,7 @@ jobs:
       - name: 📁 Stage 3: Prepare Selenium Report Assets
         run: |
           mkdir -p selenium-tests/reports
-          cp "Test Results/Excel/Passed_Test_Cases.xlsx" "selenium-tests/reports/Selenium_Web_E2E_Analysis_Report.xlsx" 2>/dev/null || true
+          cp "Test Results/Excel/Selenium_Web_E2E_Analysis_Report.xlsx" "selenium-tests/reports/Selenium_Web_E2E_Analysis_Report.xlsx" 2>/dev/null || cp "Test Results/Excel/Automation_Test_Report.xlsx" "selenium-tests/reports/Selenium_Web_E2E_Analysis_Report.xlsx" 2>/dev/null || true
 
       - name: 📦 Stage 4: Upload Artifact
         uses: actions/upload-artifact@v4

@@ -704,6 +704,12 @@ def generate_excel():
         format_sheet(ws6, "🐛 Defect Summary Log", ["Defect ID", "Test Case ID", "Module", "Title", "Defect Description"], rows6)
 
         wb_auto.save(os.path.join(EXCEL_DIR, "Automation_Test_Report.xlsx"))
+        wb_auto.save(os.path.join(EXCEL_DIR, "Selenium_Web_E2E_Analysis_Report.xlsx"))
+
+        selenium_reports_dir = os.path.join("selenium-tests", "reports")
+        os.makedirs(selenium_reports_dir, exist_ok=True)
+        wb_auto.save(os.path.join(selenium_reports_dir, "Selenium_Web_E2E_Analysis_Report.xlsx"))
+        wb_auto.save(os.path.join(selenium_reports_dir, "MediFind_Web_Selenium_Report.xlsx"))
 
         # 2. Failed_Test_Cases.xlsx
         wb_fail = openpyxl.Workbook()

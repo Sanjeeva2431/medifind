@@ -8,7 +8,7 @@
 
 | Test ID | Test Case Name | Test Suite | Status | Duration |
 | :--- | :--- | :--- | :---: | :---: |
-| `TC-WEB-AUTH-001` | **Verify Patient Web Login with Valid Credentials** | Web Authentication & User Onboarding Module | PASS ✅ | 13ms |
+| `TC-WEB-AUTH-001` | **Verify Patient Web Login with Valid Credentials** | Web Authentication & User Onboarding Module | PASS ✅ | 19ms |
 | `TC-WEB-AUTH-002` | **Verify New Patient Registration on Web Portal** | Web Authentication & User Onboarding Module | PASS ✅ | 0ms |
 | `TC-WEB-AUTH-003` | **Verify Pharmacist Portal Web Login** | Web Authentication & User Onboarding Module | PASS ✅ | 0ms |
 | `TC-WEB-SRCH-001` | **Search Medicine by Name (Ibuprofen)** | Web Medicine Search & Stock Inventory Discovery | PASS ✅ | 0ms |
