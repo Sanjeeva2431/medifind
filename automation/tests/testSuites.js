@@ -553,6 +553,6 @@ const LIVE_TEST_NAMES_MAP = {
 
 function getLiveTestName(cat, idx) {
     const list = LIVE_TEST_NAMES_MAP[cat] || [];
-    if (idx <= list.length) return list[idx - 1];
-    return `Verify Live GitHub Pages ${cat} Requirement #${idx} Compliance`;
+    if (list.length > 0) return list[(idx - 1) % list.length];
+    return `Verify ${cat} Feature Operational Check ${idx}`;
 }

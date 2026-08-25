@@ -633,8 +633,8 @@ const ANDROID_TEST_NAMES_MAP = {
 
 function getScenarioTitle(moduleName, index) {
     const list = ANDROID_TEST_NAMES_MAP[moduleName] || [];
-    if (index <= list.length) {
-        return list[index - 1];
+    if (list.length > 0) {
+        return list[(index - 1) % list.length];
     }
-    return `Verify ${moduleName} Feature Requirement #${index} Compliance`;
+    return `Verify ${moduleName} Mobile Feature Check ${index}`;
 }

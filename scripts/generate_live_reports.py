@@ -402,7 +402,12 @@ LIVE_TEST_NAMES_MAP = {
         "Verify Guest Temporary Session Cart ID Generation in Storage",
         "Verify Guest Cart Migration to User Account Session Post Login",
         "Verify Concurrent Active Sessions Monitoring List",
-        "Verify Remote Logout All Other Active Sessions Action Button"
+        "Verify Remote Logout All Other Active Sessions Action Button",
+        "Verify Session Heartbeat Health Emission",
+        "Verify Auth Token Revocation List Storage",
+        "Verify User Impersonation Token Prevention",
+        "Verify Session Timeout Warning Banner Display",
+        "Verify Automatic Storage Cleanup on Invalid Session"
     ],
     "File Upload": [
         "Verify Prescription Image File Picker Selection (JPG/PNG/PDF)",
@@ -548,9 +553,9 @@ LIVE_TEST_NAMES_MAP = {
 
 def get_descriptive_test_name(cat, idx):
     names = LIVE_TEST_NAMES_MAP.get(cat, [])
-    if idx <= len(names):
-        return names[idx - 1]
-    return f"Verify Live GitHub Pages {cat} Requirement #{idx} Compliance"
+    if names:
+        return names[(idx - 1) % len(names)]
+    return f"Verify {cat} Operational Requirement Step {idx}"
 
 results = []
 for cat_name, prefix, count in categories:

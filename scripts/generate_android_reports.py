@@ -571,9 +571,9 @@ ANDROID_TEST_NAMES_MAP = {
 
 def get_android_test_name(mod, idx):
     names = ANDROID_TEST_NAMES_MAP.get(mod, [])
-    if idx <= len(names):
-        return names[idx - 1]
-    return f"Verify Android {mod} Feature Requirement #{idx} Compliance"
+    if names:
+        return names[(idx - 1) % len(names)]
+    return f"Verify {mod} Mobile Feature Step {idx}"
 
 for mod_name, prefix, count in modules_config:
     for i in range(1, count + 1):
